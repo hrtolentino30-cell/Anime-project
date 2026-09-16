@@ -58,7 +58,7 @@ export function AdminControls() {
   );
 }
 
-export function RetryButton({ id }: { id: string }) {
+export function RetryButton({ sourceUrl }: { sourceUrl: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -66,7 +66,7 @@ export function RetryButton({ id }: { id: string }) {
     setBusy(true);
     setError('');
     try {
-      await callAdmin({ action: 'retry', id });
+      await callAdmin({ action: 'sync_url', url: sourceUrl });
       location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Retry failed.');
