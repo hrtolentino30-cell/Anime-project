@@ -30,6 +30,18 @@ export async function getAnimeBySlug(slug:string){
   return {anime,episodes:episodes??[],related:relations??[]};
 }
 
+function orderVideoSources<T extends {source_type?:string|null;server_name?:string|null;created_at?:string|null}>(sources:T[]){
+  const rank=(type?:string|null)=>type==='hls'?0:type==='mp4'?1:type==='embed'?2:3;
+  return [...sources].sort((a,b)=>{
+    const byType=rank(a.source_type)-rank(b.source_type);
+    if(byType!==0)return byType;
+    const aDefault=(a.server_name??'').toLowerCase()==='default'?0:1;
+    const bDefault=(b.server_name??'').toLowerCase()==='default'?0:1;
+    if(aDefault!==bDefault)return aDefault-bDefault;
+    return String(a.created_at??'').localeCompare(String(b.created_at??''));
+  });
+}
+
 export async function getWatchData(episodeId:string){
   const db=await createSupabaseServerClient();
   const {data:episode,error}=await db.from('episodes').select('*,anime:anime_id(*)').eq('id',episodeId).single();
@@ -45,5 +57,5 @@ export async function getWatchData(episodeId:string){
     const {data}=await db.from('playback_progress').select('*').eq('user_id',user.id).eq('episode_id',episodeId).maybeSingle();
     progress=data;
   }
-  return {episode,sources:sources??[],siblings:siblings??[],progress,userId:user?.id??null};
+  return {episode,sources:orderVideoSources(sources??[]),siblings:siblings??[],progress,userId:user?.id??null};
 }
