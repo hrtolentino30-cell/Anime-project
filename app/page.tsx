@@ -4,6 +4,7 @@ import { Bookmark, CalendarDays, ChevronRight, Grid3X3, ListFilter, Play } from 
 import { getHomeData } from '@/lib/data';
 import { Hero } from '@/components/Hero';
 import { AnimeCard } from '@/components/AnimeCard';
+import './home.css';
 
 export const revalidate = 60;
 
