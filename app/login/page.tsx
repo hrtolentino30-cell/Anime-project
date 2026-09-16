@@ -1,0 +1,1 @@
+import Link from 'next/link';import { AuthForm } from '@/components/AuthForm';export default function Login(){return <div className="authPage"><div className="authCard"><span className="eyebrow">WELCOME BACK</span><h1>Log in</h1><AuthForm mode="login"/><p className="authSwitch">New here? <Link href="/register">Create an account</Link></p></div></div>}

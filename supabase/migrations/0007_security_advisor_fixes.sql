@@ -1,0 +1,16 @@
+create schema if not exists private;
+revoke all on schema private from public, anon, authenticated;
+grant usage on schema private to anon, authenticated, service_role;
+create or replace function private.is_admin() returns boolean language sql stable security definer set search_path = '' as $$ select exists(select 1 from public.admin_users where user_id = (select auth.uid())); $$;
+revoke all on function private.is_admin() from public, anon, authenticated;
+grant execute on function private.is_admin() to anon, authenticated, service_role;
+drop policy if exists catalog_video_read on public.video_sources; create policy catalog_video_read on public.video_sources for select using (is_active or private.is_admin());
+drop policy if exists own_profile_select on public.profiles; create policy own_profile_select on public.profiles for select using ((select auth.uid()) = user_id or private.is_admin());
+drop policy if exists admin_source_items on public.source_items; create policy admin_source_items on public.source_items for select using (private.is_admin());
+drop policy if exists admin_sync_queue on public.sync_queue; create policy admin_sync_queue on public.sync_queue for select using (private.is_admin());
+drop policy if exists admin_sync_queue_update on public.sync_queue; create policy admin_sync_queue_update on public.sync_queue for update using (private.is_admin()) with check (private.is_admin());
+drop policy if exists admin_sync_runs on public.sync_runs; create policy admin_sync_runs on public.sync_runs for select using (private.is_admin());
+drop policy if exists admin_sync_events on public.sync_events; create policy admin_sync_events on public.sync_events for select using (private.is_admin());
+drop function if exists public.is_admin();
+create or replace function public.touch_updated_at() returns trigger language plpgsql set search_path = '' as $$ begin new.updated_at = now(); return new; end $$;
+revoke execute on function public.touch_updated_at() from public, anon, authenticated;

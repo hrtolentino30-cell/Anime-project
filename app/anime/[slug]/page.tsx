@@ -1,0 +1,13 @@
+import Image from 'next/image';
+import Link from 'next/link';
+import { notFound } from 'next/navigation';
+import { Play } from 'lucide-react';
+import { getAnimeBySlug } from '@/lib/data';
+import { FavoriteButton } from '@/components/FavoriteButton';
+import { AnimeCard } from '@/components/AnimeCard';
+export const revalidate=60;
+export default async function AnimePage({params}:{params:Promise<{slug:string}>}){
+  const {slug}=await params; const data=await getAnimeBySlug(slug); if(!data)notFound();
+  const {anime,episodes,related}=data; const first=episodes[0]; const art=anime.banner_url||anime.poster_url;
+  return <div className="detailPage">{art&&<div className="detailBackdrop"><Image src={art} alt="" fill priority sizes="100vw" className="heroImage"/><div className="detailGradient"/></div>}<div className="detailContent pageWidth"><div className="detailPoster">{anime.poster_url?<Image src={anime.poster_url} alt={anime.title} fill sizes="220px"/>:<div className="posterFallback">{anime.title[0]}</div>}</div><div className="detailInfo"><span className="eyebrow">{[anime.type,anime.status].filter(Boolean).join(' · ')}</span><h1>{anime.title}</h1>{anime.title_japanese&&<p className="altTitles">{anime.title_japanese}</p>}<p className="detailDescription">{anime.description||'Synopsis not available yet.'}</p><div className="chips">{[anime.season,anime.year,anime.duration,anime.rating?`★ ${anime.rating}`:null].filter(Boolean).map(String).map(x=><span key={x}>{x}</span>)}</div><p className="studios">Studio: {anime.anime_studios?.map((x:any)=>x.studios?.name).filter(Boolean).join(', ')||'—'} · Genres: {anime.anime_genres?.map((x:any)=>x.genres?.name).filter(Boolean).join(', ')||'—'}</p><div className="heroButtons">{first&&<Link className="primaryBtn" href={`/watch/${first.id}`}><Play size={18} fill="currentColor"/>Start episode {first.episode_number}</Link>}<FavoriteButton animeId={anime.id}/></div></div></div><section className="episodes pageWidth"><div className="sectionHead"><h2>Episodes</h2><span>{episodes.length} available</span></div><div className="episodeList">{episodes.map((ep:any)=><Link href={`/watch/${ep.id}`} key={ep.id}><span className="epNum">{String(ep.episode_number).padStart(2,'0')}</span><div><strong>{ep.title||`Episode ${ep.episode_number}`}</strong><small>{ep.air_date?new Date(ep.air_date).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}):'Release date unavailable'}</small></div><Play size={16}/></Link>)}</div></section>{related.length>0&&<section className="section pageWidth"><div className="sectionHead"><h2>Related anime</h2></div><div className="cardGrid">{related.map((r:any)=>r.related&&<AnimeCard key={r.related.id} anime={r.related}/>)}</div></section>}</div>;
+}

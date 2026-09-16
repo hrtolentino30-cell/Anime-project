@@ -1,0 +1,17 @@
+drop policy if exists own_profile_update on public.profiles; create policy own_profile_update on public.profiles for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists own_admin_membership on public.admin_users; create policy own_admin_membership on public.admin_users for select using ((select auth.uid()) = user_id);
+drop policy if exists own_favorites_all on public.favorites; create policy own_favorites_all on public.favorites for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists own_history_all on public.watch_history; create policy own_history_all on public.watch_history for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+drop policy if exists own_progress_all on public.playback_progress; create policy own_progress_all on public.playback_progress for all using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create index if not exists anime_characters_character_idx on public.anime_characters(character_id);
+create index if not exists anime_genres_genre_idx on public.anime_genres(genre_id);
+create index if not exists anime_studios_studio_idx on public.anime_studios(studio_id);
+create index if not exists character_voice_actors_character_idx on public.character_voice_actors(character_id);
+create index if not exists character_voice_actors_voice_actor_idx on public.character_voice_actors(voice_actor_id);
+create index if not exists favorites_anime_idx on public.favorites(anime_id);
+create index if not exists playback_progress_anime_idx on public.playback_progress(anime_id);
+create index if not exists playback_progress_episode_idx on public.playback_progress(episode_id);
+create index if not exists related_anime_related_idx on public.related_anime(related_anime_id);
+create index if not exists sync_events_run_idx on public.sync_events(run_id);
+create index if not exists watch_history_anime_idx on public.watch_history(anime_id);
+create index if not exists watch_history_episode_idx on public.watch_history(episode_id);

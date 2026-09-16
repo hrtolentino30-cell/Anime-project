@@ -1,0 +1,5 @@
+'use client';
+import { useEffect,useState } from 'react';
+import { Heart } from 'lucide-react';
+import { createSupabaseBrowserClient } from '@/lib/supabase/client';
+export function FavoriteButton({animeId}:{animeId:string}){const [active,setActive]=useState(false),[userId,setUserId]=useState<string|null>(null),[busy,setBusy]=useState(false);useEffect(()=>{const db=createSupabaseBrowserClient();(async()=>{const {data:{user}}=await db.auth.getUser();setUserId(user?.id??null);if(user){const {data}=await db.from('favorites').select('anime_id').eq('user_id',user.id).eq('anime_id',animeId).maybeSingle();setActive(Boolean(data))}})()},[animeId]);async function toggle(){if(!userId){location.href='/login';return}setBusy(true);const db=createSupabaseBrowserClient();if(active)await db.from('favorites').delete().eq('user_id',userId).eq('anime_id',animeId);else await db.from('favorites').insert({user_id:userId,anime_id:animeId});setActive(!active);setBusy(false)}return <button className={active?'primaryBtn':'ghostBtn'} disabled={busy} onClick={toggle}><Heart size={18} fill={active?'currentColor':'none'}/>{active?'In My List':'Add to My List'}</button>}

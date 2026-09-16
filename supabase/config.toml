@@ -1,0 +1,10 @@
+project_id = "agiqhqnqkiagnabbczyf"
+
+[functions.scanner]
+verify_jwt = false
+[functions.worker]
+verify_jwt = false
+[functions.admin-sync]
+verify_jwt = true
+[functions.verify-sources]
+verify_jwt = false

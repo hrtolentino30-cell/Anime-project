@@ -1,0 +1,1 @@
+import Link from 'next/link';export default function NotFound(){return <div className="pageWidth standalone narrow"><div className="emptyState"><span className="eyebrow">404</span><h1>That page drifted out of range.</h1><p>The catalog may have changed, or the URL is incorrect.</p><Link className="primaryBtn" href="/">Back home</Link></div></div>}
