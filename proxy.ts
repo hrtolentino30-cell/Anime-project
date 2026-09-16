@@ -1,6 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from './lib/supabase/config';
+
+const SUPABASE_URL = 'https://agiqhqnqkiagnabbczyf.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_z2YIz5bTDb1ALmGAdxXFAw_QuBu2xbK';
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
