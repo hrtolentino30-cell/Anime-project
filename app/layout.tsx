@@ -1,5 +1,43 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Header } from '@/components/Header';
-export const metadata:Metadata={title:{default:'AnimeSync',template:'%s · AnimeSync'},description:'An automatically synchronized anime streaming catalog.'};
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body><Header/><main>{children}</main><footer className="footer"><div className="brand"><span className="brandMark">A</span><span>ANIME<span>SYNC</span></span></div><p>Catalog updates are synchronized automatically from the authorized source pipeline.</p></footer></body></html>}
+
+export const metadata: Metadata = {
+  metadataBase: new URL('https://animori.vercel.app'),
+  title: {
+    default: 'Animori',
+    template: '%s · Animori',
+  },
+  description: 'Discover and watch anime from a catalog that stays synchronized automatically.',
+  applicationName: 'Animori',
+  openGraph: {
+    type: 'website',
+    siteName: 'Animori',
+    title: 'Animori',
+    description: 'Discover and watch anime from a catalog that stays synchronized automatically.',
+    url: '/',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Animori',
+    description: 'Discover and watch anime from a catalog that stays synchronized automatically.',
+  },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <body>
+        <Header />
+        <main>{children}</main>
+        <footer className="footer">
+          <div className="brand">
+            <span className="brandMark">A</span>
+            <span>ANI<span>MORI</span></span>
+          </div>
+          <p>Your anime catalog, kept fresh automatically.</p>
+        </footer>
+      </body>
+    </html>
+  );
+}
