@@ -1,5 +1,6 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import './polish.css';
 import { Header } from '@/components/Header';
 
 export const metadata: Metadata = {
@@ -22,6 +23,13 @@ export const metadata: Metadata = {
     title: 'Animori',
     description: 'Discover and watch anime from a catalog that stays synchronized automatically.',
   },
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#07090e',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
