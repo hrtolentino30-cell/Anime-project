@@ -19,6 +19,14 @@ function episodeNumberFromUrl(url: string, fallbackText = '') {
   return m ? Number(m[1]) : undefined;
 }
 
+function ratioFromUrl(src?: string) {
+  if (!src) return undefined;
+  const m = src.match(/[-_](\d{2,4})x(\d{2,4})(?=[._-]|$)/i);
+  if (!m) return undefined;
+  const width = Number(m[1]), height = Number(m[2]);
+  return height > 0 ? width / height : undefined;
+}
+
 export async function parseAnime(html: string, url: string, client: UpstreamClient): Promise<AnimeData> {
   const $ = load(html);
   const main = $('main,article,.postbody,.animefull,.bigcontent').first();
@@ -35,7 +43,7 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
     const alt = clean(el.attr('alt')) ?? '';
     const width = Number.parseFloat(el.attr('width') ?? el.attr('data-width') ?? '');
     const height = Number.parseFloat(el.attr('height') ?? el.attr('data-height') ?? '');
-    const ratio = Number.isFinite(width) && Number.isFinite(height) && height > 0 ? width / height : undefined;
+    const ratio = Number.isFinite(width) && Number.isFinite(height) && height > 0 ? width / height : ratioFromUrl(src);
     const context = [
       src,
       alt,
@@ -64,7 +72,8 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
     const context = `og-image ${ogImage}`.toLowerCase();
     const obviousWide = /backdrop|wide|landscape|banner|hero|slider|header|wallpaper/i.test(context);
     const obviousNonPoster = /\blogo\b|episode|thumbnail|\bthumb\b|screenshot|avatar|\bicon\b/i.test(context);
-    imageCandidates.push({ src: ogImage, index: imageCandidates.length + 1000, context, obviousWide, obviousNonPoster, posterScore: obviousWide ? -24 : 1 });
+    const ratio = ratioFromUrl(ogImage);
+    imageCandidates.push({ src: ogImage, index: imageCandidates.length + 1000, ratio, context, obviousWide, obviousNonPoster, posterScore: obviousWide || (ratio != null && ratio >= 1.15) ? -24 : 1 });
   }
 
   const posterCandidate = [...imageCandidates]
@@ -73,15 +82,17 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
 
   const style = root.find('[style*="background-image"]').first().attr('style');
   const bannerMatch = style?.match(/url\(["']?([^"')]+)["']?\)/i);
+  const styleBanner = bannerMatch?.[1];
+  const styleBannerRatio = ratioFromUrl(styleBanner);
   const inferredBanner = [...imageCandidates]
-    .filter(c => c.obviousWide || (c.ratio != null && c.ratio >= 1.2))
+    .filter(c => (c.obviousWide || (c.ratio != null && c.ratio >= 1.2)) && !(c.ratio != null && c.ratio < 1.05))
     .sort((a, b) => {
       const score = (c: typeof a) => (c.obviousWide ? 12 : 0) + (c.ratio != null && c.ratio >= 1.2 ? 8 : 0) - (/\blogo\b|episode|thumbnail|\bthumb\b|avatar|\bicon\b/i.test(c.context) ? 12 : 0);
       return score(b) - score(a) || a.index - b.index;
     })[0]?.src;
 
   const poster = posterCandidate?.src;
-  const banner = bannerMatch?.[1] ?? inferredBanner;
+  const banner = styleBanner && !(styleBannerRatio != null && styleBannerRatio < 1.05) ? styleBanner : inferredBanner;
   const status = labelValue(bodyText, 'Status');
   const studioRaw = labelValue(bodyText, 'Studio');
   const released = labelValue(bodyText, 'Released');
