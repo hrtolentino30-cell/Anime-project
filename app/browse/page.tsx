@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { AnimeCard } from '@/components/AnimeCard';
 
@@ -60,6 +61,7 @@ export default async function BrowsePage({ searchParams }: { searchParams: Promi
   const loadError = error || genresResult.error || studiosResult.error || genreLinks?.error || studioLinks?.error;
   const total = count ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (total > 0 && page > pages) redirect(pageUrl(pages));
   const years = Array.from({ length: 60 }, (_, index) => String(new Date().getFullYear() - index));
   if (year && !years.includes(year)) years.push(year);
 

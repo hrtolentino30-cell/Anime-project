@@ -43,6 +43,6 @@ The separate ChatGPT conversations do not share a direct messaging channel. Use 
 - Existing seven repository tests passed.
 - Production build passed on Next.js 16.3.5, installed within the existing package ranges.
 - Public catalog read succeeded using the existing publishable credentials.
-- Browser review is recorded in the pull request after preview verification.
+- Browser review completed against the Vercel preview: home render, live search, empty search, browse filters, pagination, navigation, and no horizontal overflow at the available viewport were verified. Responsive CSS and touch target rules were also reviewed.
 
 Authenticated favorites/progress writes and actual video availability are outside this frontend pass; playback and login implementations were preserved.

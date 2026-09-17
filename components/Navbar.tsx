@@ -30,7 +30,7 @@ export async function Navbar() {
       <NavLink href="/" className="mobileNavItem"><Home aria-hidden="true" /><span>Home</span></NavLink>
       <NavLink href="/browse" className="mobileNavItem"><Compass aria-hidden="true" /><span>Browse</span></NavLink>
       <NavLink href="/search" className="mobileNavItem"><Search aria-hidden="true" /><span>Search</span></NavLink>
-      <NavLink href="/my-list" className="mobileNavItem"><Bookmark aria-hidden="true" /><span>My List</span></NavLink>
+      {user && <NavLink href="/my-list" className="mobileNavItem"><Bookmark aria-hidden="true" /><span>My List</span></NavLink>}
       <NavLink href={user ? '/account' : '/login'} className="mobileNavItem"><UserRound aria-hidden="true" /><span>{user ? 'Account' : 'Sign in'}</span></NavLink>
     </nav>
   </>;
