@@ -12,7 +12,7 @@ export function Player({episodeId,animeId,sources,userId,initialPosition=0,nextE
   const source=useMemo(()=>sources.find(s=>s.id===selected)??sources[0],[sources,selected]);
 
   useEffect(()=>{if(!sources.some(s=>s.id===selected))setSelected(sources[0]?.id??'')},[sources,selected]);
-  useEffect(()=>{if(!userId)return;const db=createSupabaseBrowserClient();void db.from('watch_history').upsert({user_id:userId,anime_id:animeId,episode_id:episodeId,watched_at:new Date().toISOString()},{onConflict:'user_id,episode_id'}).then(({error})=>{if(error)setSaveError('Watch history could not be saved.')})},[userId,episodeId,animeId]);
+  useEffect(()=>{if(!userId)return;const db=createSupabaseBrowserClient();void db.from('watch_history').upsert({user_id:userId,anime_id:animeId,episode_id:episodeId,watched_at:new Date().toISOString()},{onConflict:'user_id,episode_id'}).then((result)=>{if(result.error)setSaveError('Watch history could not be saved.')})},[userId,episodeId,animeId]);
 
   useEffect(()=>{
     const video=videoRef.current;if(!video||!source)return;const url=source.stream_url??source.embed_url;if(!url)return;
