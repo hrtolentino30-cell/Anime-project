@@ -27,10 +27,15 @@ function ratioFromUrl(src?: string) {
   return height > 0 ? width / height : undefined;
 }
 
+function unique(values: Array<string | undefined | null>) {
+  return [...new Set(values.map(v => clean(v)).filter(Boolean) as string[])];
+}
+
 export async function parseAnime(html: string, url: string, client: UpstreamClient): Promise<AnimeData> {
   const $ = load(html);
+  const doc = $.root();
   const main = $('main,article,.postbody,.animefull,.bigcontent').first();
-  const root = main.length ? main : $.root();
+  const root = main.length ? main : doc;
   const bodyText = root.text().replace(/\s+/g, ' ').trim();
   const title = scrubSourceLabel(clean(root.find('h1').first().text()) ?? firstMeta($, { property: 'og:title' }), client.baseUrl) ?? slugFromUrl(url).replace(/-/g, ' ');
   const ogImage = firstMeta($, { property: 'og:image' });
@@ -101,15 +106,30 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
   const duration = labelValue(bodyText, 'Duration');
   const episodesRaw = labelValue(bodyText, 'Episodes');
   const updatedRaw = bodyText.match(/Updated on:\s*([^|]+?)(?=\s+(?:Released on:|Synopsis|Genres|$))/i)?.[1];
-  const synopsisHeading = root.find('h2,h3,h4').filter((_, el) => /synopsis/i.test($(el).text())).first();
+  const synopsisHeading = doc.find('h2,h3,h4').filter((_, el) => /synopsis/i.test($(el).text())).first();
   let description = scrubSourceLabel(clean(synopsisHeading.nextAll('p').first().text()), client.baseUrl);
   if (!description) description = scrubSourceLabel(firstMeta($, { name: 'description' }), client.baseUrl);
-  const altTextCandidates = root.find('h1').first().nextAll('div,p').slice(0, 4).toArray().map(e => scrubSourceLabel(clean($(e).text()), client.baseUrl)).filter(Boolean) as string[];
-  const altRaw = altTextCandidates.find(v => v.length < 600 && /[,，、]/.test(v) && !/Status:|Watch full episodes/i.test(v));
-  const alternativeTitles = splitNames(altRaw?.replace(/[、，]/g, ','));
+
+  const explicitAltNodes = doc.find('.alter,.alternative,.alternative-title,.alternative-titles,.anime-alt-title,[class*="alter"]');
+  const titleNode = doc.find('h1').first();
+  const altTextCandidates = unique([
+    ...explicitAltNodes.toArray().map(e => scrubSourceLabel(clean($(e).text()), client.baseUrl)),
+    ...titleNode.nextAll('p,div,span').slice(0, 12).toArray().map(e => scrubSourceLabel(clean($(e).text()), client.baseUrl)),
+    ...titleNode.parent().find('p,div,span').slice(0, 18).toArray().map(e => scrubSourceLabel(clean($(e).text()), client.baseUrl)),
+  ]).filter(v => v !== title && v.length < 600 && !/Status:|Released:|Duration:|Type:|Genres:|Watch full episodes|stream |download |Synopsis|Episode\s+\d+/i.test(v));
+  const altRaw = altTextCandidates.find(v => /[\u3040-\u30ff\u3400-\u9fff]/.test(v) || /[,，、]/.test(v));
+  const alternativeTitles = splitNames(altRaw?.replace(/[、，]/g, ',')).filter(v => v.toLowerCase() !== title.toLowerCase());
   const titleJapanese = alternativeTitles.find(v => /[\u3040-\u30ff\u3400-\u9fff]/.test(v));
   const titleEnglish = alternativeTitles.find(v => /^[\x00-\x7F]+$/.test(v) && v.toLowerCase() !== title.toLowerCase());
-  const genres = [...new Set(root.find('a[href*="/genre/"]').toArray().map(a => clean($(a).text())).filter(Boolean) as string[])];
+
+  const genreSelector = 'a[href*="/genres/"],a[href*="/genre/"]';
+  let genreNodes = root.find(`.genxed ${genreSelector},.genres ${genreSelector},.genre-info ${genreSelector},[class*="genre"] ${genreSelector}`);
+  if (!genreNodes.length) {
+    const firstGenre = root.find(genreSelector).first();
+    const genreBox = firstGenre.closest('p,li,span,div').first();
+    genreNodes = genreBox.length ? genreBox.find(genreSelector) : root.find(genreSelector).slice(0, 10);
+  }
+  const genres = unique(genreNodes.toArray().map(a => clean($(a).text()))).slice(0, 20);
   const studiosFromLinks = root.find('a[href*="/studio/"]').toArray().map(a => clean($(a).text())).filter(Boolean) as string[];
   const studios = [...new Set(studiosFromLinks.length ? studiosFromLinks : splitNames(studioRaw))];
 
@@ -138,23 +158,74 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
   const relatedAnimeUrls = [...new Set(root.find('a[href*="/anime/"]').toArray().map(a => client.absolute($(a).attr('href')!)).filter(u => u !== url))].slice(0, 50);
   const characters: CharacterData[] = [];
   const originLabel = client.baseUrl.hostname.replace(/^www\./, '').split('.')[0].toLowerCase();
-  root.find('img').each((_, img) => {
-    const alt = clean($(img).attr('alt'));
-    if (!alt || alt === title || alt.toLowerCase().includes(originLabel)) return;
-    const box = $(img).closest('li,.character,.char-item,.item,.flex').first();
-    const txt = clean(box.text());
-    if (!txt || txt.length > 500 || !/(Main|Supporting|Japanese|English)/i.test(txt)) return;
-    const role = /\bMain\b/i.test(txt) ? 'Main' : /\bSupporting\b/i.test(txt) ? 'Supporting' : undefined;
-    const names = txt.split(/Main|Supporting|Japanese|English/i).map(v => clean(v)).filter(Boolean) as string[];
-    const voiceName = names.find(n => n !== alt && n.length < 100);
-    characters.push({
-      sourceId: sourceId('character', client.absolute($(img).closest('a[href]').attr('href') ?? `/character/${encodeURIComponent(alt)}/`)),
-      name: alt,
-      imageUrl: $(img).attr('data-src') ?? $(img).attr('src') ?? undefined,
-      role,
-      voiceActors: voiceName ? [{ name: voiceName, language: /English/i.test(txt) ? 'English' : 'Japanese' }] : [],
+  const characterHeading = doc.find('h2,h3,h4').filter((_, el) => /characters?\s*(?:&|and)?\s*voice actors?/i.test($(el).text())).first();
+  let characterImages = characterHeading.length ? characterHeading.nextUntil('h2,h3,h4').find('img').toArray() : [];
+  if (!characterImages.length) {
+    characterImages = doc.find('img').toArray().filter(img => {
+      let node = $(img).parent();
+      for (let depth = 0; depth < 5 && node.length; depth++, node = node.parent()) {
+        const txt = clean(node.text());
+        if (txt && txt.length < 600 && /\b(Main|Supporting|Japanese|English)\b/i.test(txt)) return true;
+      }
+      return false;
     });
-  });
+  }
+
+  let lastCharacter: CharacterData | undefined;
+  for (const img of characterImages) {
+    const el = $(img);
+    const alt = clean(el.attr('alt'));
+    if (!alt || alt === title || alt.toLowerCase().includes(originLabel)) continue;
+    let node = el.parent();
+    let txt: string | undefined;
+    for (let depth = 0; depth < 6 && node.length; depth++, node = node.parent()) {
+      const candidate = clean(node.text());
+      if (candidate && candidate.length < 600 && /\b(Main|Supporting|Japanese|English)\b/i.test(candidate)) {
+        txt = candidate;
+        break;
+      }
+    }
+    if (!txt) continue;
+    const role = /\bMain\b/i.test(txt) ? 'Main' : /\bSupporting\b/i.test(txt) ? 'Supporting' : undefined;
+    const language = /\bEnglish\b/i.test(txt) ? 'English' : /\bJapanese\b/i.test(txt) ? 'Japanese' : undefined;
+    const imageUrl = el.attr('data-src') ?? el.attr('data-lazy-src') ?? el.attr('src') ?? undefined;
+    const href = el.closest('a[href]').attr('href');
+
+    if (role) {
+      const character: CharacterData = {
+        sourceId: sourceId('character', href ? client.absolute(href) : `/character/${encodeURIComponent(alt)}/`),
+        name: alt,
+        imageUrl,
+        role,
+        voiceActors: [],
+      };
+      const inlineVoice = txt.match(/\b(?:Main|Supporting)\b\s+(.+?)\s+\b(Japanese|English)\b/i);
+      const inlineName = clean(inlineVoice?.[1]);
+      if (inlineName && inlineName.toLowerCase() !== alt.toLowerCase() && inlineName.length < 120) {
+        character.voiceActors!.push({ name: inlineName, language: inlineVoice?.[2], sourceId: `voice:${inlineName.toLowerCase()}:${(inlineVoice?.[2] ?? 'unknown').toLowerCase()}` });
+      }
+      const existing = characters.find(c => c.name.toLowerCase() === character.name.toLowerCase());
+      if (!existing) {
+        characters.push(character);
+        lastCharacter = character;
+      } else {
+        lastCharacter = existing;
+      }
+      continue;
+    }
+
+    if (language && lastCharacter && alt.toLowerCase() !== lastCharacter.name.toLowerCase()) {
+      lastCharacter.voiceActors ??= [];
+      if (!lastCharacter.voiceActors.some(v => v.name.toLowerCase() === alt.toLowerCase() && v.language === language)) {
+        lastCharacter.voiceActors.push({
+          sourceId: href ? sourceId('voice', client.absolute(href)) : `voice:${alt.toLowerCase()}:${language.toLowerCase()}`,
+          name: alt,
+          language,
+          imageUrl,
+        });
+      }
+    }
+  }
 
   const latestEpisode = uniqueEpisodes.length ? Math.max(...uniqueEpisodes.map(e => e.episodeNumber)) : undefined;
   const ratingText = bodyText.match(/Rating\s*([0-9]+(?:\.[0-9]+)?)/i)?.[1];
