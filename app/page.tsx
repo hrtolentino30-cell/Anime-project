@@ -13,7 +13,7 @@ export default async function Home() {
   const hero = data.updatedAnime.find((a: any) => a.banner_url || a.poster_url) ?? data.updatedAnime[0];
   const latest = data.latestEpisodes.slice(0, 6);
   const recentlyUpdated = data.updatedAnime.filter((a: any) => a.id !== hero?.id).slice(0, 8);
-  const trending = [...data.updatedAnime]
+  const trending = [...data.updatedAnime].filter((a: any) => Number(a.rating) > 0)
     .sort((a: any, b: any) => (b.rating ?? 0) - (a.rating ?? 0))
     .slice(0, 8);
 
@@ -26,6 +26,7 @@ export default async function Home() {
           <Link href="/schedule">Schedule <ChevronRight size={14} /></Link>
         </div>
         <div className="homeUpdateList">
+          {!latest.length && <p className="homeUpdatesEmpty">New episodes will appear here as they become available.</p>}
           {latest.map((ep: any) => <Link href={`/watch/${ep.id}`} className="homeUpdateRow" key={ep.id}>
             <div className="homeUpdatePoster">
               {ep.anime?.poster_url
@@ -58,8 +59,8 @@ export default async function Home() {
     </section>}
 
     <Shelf eyebrow="FRESH" title="Recently updated" href="/browse" items={recentlyUpdated} />
-    <Shelf eyebrow="TOP PICKS" title="Trending now" href="/browse" items={trending} />
-    <Shelf eyebrow="AIRING" title="Current season" href="/browse" items={data.seasonal.slice(0, 8)} />
+    <Shelf eyebrow="FROM RECENT UPDATES" title="Highly rated" href="/browse?sort=rating" items={trending} />
+    <Shelf eyebrow="FOLLOW THE STORY" title="Airing now" href="/browse?status=Ongoing" items={data.seasonal.slice(0, 8)} />
 
     <div className="homeMiniShelves pageWidth">
       <MiniShelf title="Movies" href="/browse?type=movie" items={data.movies.slice(0, 4)} />
