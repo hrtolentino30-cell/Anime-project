@@ -6,9 +6,7 @@ import { SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from '@/lib/supabase/config';
 const HOME_ANIME_FIELDS='id,slug,title,description,poster_url,banner_url,type,status,season,year,rating,latest_episode,updated_at';
 
 function createPublicCatalogClient(){
-  return createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{
-    auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
-  });
+  return createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
 }
 
 const getCachedHomeCatalog=unstable_cache(async()=>{
@@ -38,18 +36,16 @@ export async function getHomeData(){
 
 const getCachedAnimeBySlug=unstable_cache(async(slug:string)=>{
   const db=createPublicCatalogClient();
-  const {data:anime,error}=await (db.from('anime') as any).select('id,slug,title,title_english,title_japanese,description,poster_url,banner_url,type,status,season,year,rating,duration,latest_episode,total_episodes,source_updated_at,created_at,updated_at,anime_genres(genres(id,name,slug)),anime_studios(studios(id,name,slug)),anime_titles(kind,title)').eq('slug',slug).single();
+  const {data:anime,error}=await (db.from('anime') as any).select('id,slug,title,title_english,title_japanese,description,poster_url,banner_url,type,status,season,year,rating,duration,latest_episode,total_episodes,source_updated_at,created_at,updated_at,anime_genres(genres(id,name,slug)),anime_studios(studios(id,name,slug)),anime_titles(kind,title),anime_characters(role,characters(id,name,image_url,character_voice_actors(language,voice_actors(id,name,language,image_url))))').eq('slug',slug).single();
   if(error||!anime)return null;
   const [{data:episodes},{data:relations}]=await Promise.all([
     (db.from('episodes') as any).select('id,anime_id,episode_number,title,thumbnail_url,air_date,created_at,updated_at').eq('anime_id',anime.id).order('episode_number',{ascending:true}),
     (db.from('related_anime') as any).select('relation_type,related:related_anime_id(id,slug,title,poster_url,type,status,year,rating)').eq('anime_id',anime.id).limit(12),
   ]);
   return {anime,episodes:episodes??[],related:relations??[]};
-},['animori-anime-detail-v4'],{revalidate:300});
+},['animori-anime-detail-v5'],{revalidate:300});
 
-export async function getAnimeBySlug(slug:string){
-  return getCachedAnimeBySlug(slug);
-}
+export async function getAnimeBySlug(slug:string){return getCachedAnimeBySlug(slug)}
 
 function orderVideoSources<T extends {source_type?:string|null;server_name?:string|null;created_at?:string|null}>(sources:T[]){
   const rank=(type?:string|null)=>type==='hls'?0:type==='mp4'?1:type==='embed'?2:3;
@@ -68,13 +64,15 @@ const getCachedWatchCore=unstable_cache(async(episodeId:string)=>{
   const {data:episode,error}=await (db.from('episodes') as any).select('id,anime_id,episode_number,title,thumbnail_url,air_date,created_at,updated_at,anime:anime_id(id,slug,title,title_english,title_japanese,description,poster_url,banner_url,type,status,season,year,rating,duration,latest_episode,total_episodes,source_updated_at,created_at,updated_at)').eq('id',episodeId).single();
   if(error||!episode)return null;
   const [{data:sources},{data:siblings}]=await Promise.all([
-    db.from('video_sources').select('*').eq('episode_id',episodeId).eq('is_active',true).order('created_at',{ascending:true}),
+    db.from('video_sources').select('id,server_name,source_type,embed_url,stream_url,quality,language,created_at').eq('episode_id',episodeId).eq('is_active',true).order('created_at',{ascending:true}),
     db.from('episodes').select('id,episode_number,title').eq('anime_id',episode.anime_id).order('episode_number',{ascending:true}),
   ]);
   const ordered=orderVideoSources(sources??[]);
   const direct=ordered.filter((source:any)=>source.source_type==='hls'||source.source_type==='mp4');
-  return {episode,sources:direct.length?direct:ordered,siblings:siblings??[]};
-},['animori-watch-core-v4'],{revalidate:60});
+  const fallback=ordered.filter((source:any)=>source.source_type!=='hls'&&source.source_type!=='mp4');
+  const usable=direct.length?[...direct,...fallback.slice(0,3)]:ordered.slice(0,6);
+  return {episode,sources:usable,siblings:siblings??[]};
+},['animori-watch-core-v5'],{revalidate:60});
 
 export async function getWatchData(episodeId:string){
   const [core,db]=await Promise.all([getCachedWatchCore(episodeId),createSupabaseServerClient()]);
@@ -82,7 +80,7 @@ export async function getWatchData(episodeId:string){
   const {data:{user}}=await db.auth.getUser();
   let progress:any=null;
   if(user){
-    const {data}=await db.from('playback_progress').select('*').eq('user_id',user.id).eq('episode_id',episodeId).maybeSingle();
+    const {data}=await db.from('playback_progress').select('position_seconds,duration_seconds,completed,updated_at').eq('user_id',user.id).eq('episode_id',episodeId).maybeSingle();
     progress=data;
   }
   return {...core,progress,userId:user?.id??null};
