@@ -49,13 +49,7 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
     const width = Number.parseFloat(el.attr('width') ?? el.attr('data-width') ?? '');
     const height = Number.parseFloat(el.attr('height') ?? el.attr('data-height') ?? '');
     const ratio = Number.isFinite(width) && Number.isFinite(height) && height > 0 ? width / height : ratioFromUrl(src);
-    const context = [
-      src,
-      alt,
-      el.attr('class'),
-      el.parent().attr('class'),
-      el.closest('figure,div,li').attr('class'),
-    ].filter(Boolean).join(' ').toLowerCase();
+    const context = [src, alt, el.attr('class'), el.parent().attr('class'), el.closest('figure,div,li').attr('class')].filter(Boolean).join(' ').toLowerCase();
     const altNormalized = alt.toLowerCase().replace(/\s+/g, ' ').trim();
     const obviousWide = /backdrop|wide|landscape|banner|hero|slider|header|wallpaper/i.test(context);
     const obviousNonPoster = /\blogo\b|episode|thumbnail|\bthumb\b|screenshot|avatar|\bicon\b/i.test(context);
@@ -144,9 +138,7 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
     const textValue = (row.length ? row.text() : $(a).text()).replace(/\s+/g, ' ').trim();
     const dateMatch = textValue.match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},\s+\d{4}\b/i);
     episodeRefs.push({
-      sourceId: sourceId('episode', sourceUrl),
-      sourceUrl,
-      episodeNumber: num,
+      sourceId: sourceId('episode', sourceUrl), sourceUrl, episodeNumber: num,
       title: scrubSourceLabel(clean($(a).attr('title')) ?? clean($(a).text().replace(/^\s*\d+(?:\.\d+)?\s*/, '')), client.baseUrl),
       airDate: toDate(dateMatch?.[0]),
       thumbnailUrl: row.find('img').first().attr('data-src') ?? row.find('img').first().attr('src') ?? undefined,
@@ -158,124 +150,101 @@ export async function parseAnime(html: string, url: string, client: UpstreamClie
   const relatedAnimeUrls = [...new Set(root.find('a[href*="/anime/"]').toArray().map(a => client.absolute($(a).attr('href')!)).filter(u => u !== url))].slice(0, 50);
   const characters: CharacterData[] = [];
   const originLabel = client.baseUrl.hostname.replace(/^www\./, '').split('.')[0].toLowerCase();
-  const characterHeading = doc.find('h2,h3,h4').filter((_, el) => /characters?\s*(?:&|and)?\s*voice actors?/i.test($(el).text())).first();
-  let characterImages = characterHeading.length ? characterHeading.nextUntil('h2,h3,h4').find('img').toArray() : [];
-  if (!characterImages.length) {
-    characterImages = doc.find('img').toArray().filter(img => {
-      let node = $(img).parent();
-      for (let depth = 0; depth < 5 && node.length; depth++, node = node.parent()) {
-        const txt = clean(node.text());
-        if (txt && txt.length < 600 && /\b(Main|Supporting|Japanese|English)\b/i.test(txt)) return true;
-      }
-      return false;
-    });
-  }
 
-  let lastCharacter: CharacterData | undefined;
-  for (const img of characterImages) {
-    const el = $(img);
-    const alt = clean(el.attr('alt'));
-    if (!alt || alt === title || alt.toLowerCase().includes(originLabel)) continue;
-    let node = el.parent();
-    let txt: string | undefined;
-    for (let depth = 0; depth < 6 && node.length; depth++, node = node.parent()) {
-      const candidate = clean(node.text());
-      if (candidate && candidate.length < 600 && /\b(Main|Supporting|Japanese|English)\b/i.test(candidate)) {
-        txt = candidate;
-        break;
-      }
-    }
-    if (!txt) continue;
-    const role = /\bMain\b/i.test(txt) ? 'Main' : /\bSupporting\b/i.test(txt) ? 'Supporting' : undefined;
-    const language = /\bEnglish\b/i.test(txt) ? 'English' : /\bJapanese\b/i.test(txt) ? 'Japanese' : undefined;
-    const imageUrl = el.attr('data-src') ?? el.attr('data-lazy-src') ?? el.attr('src') ?? undefined;
-    const href = el.closest('a[href]').attr('href');
+  const personImage = (name: string) => {
+    const lowered = name.toLowerCase();
+    const img = doc.find('img[alt]').filter((_, node) => (clean($(node).attr('alt')) ?? '').toLowerCase() === lowered).first();
+    if (!img.length) return {};
+    const src = img.attr('data-src') ?? img.attr('data-lazy-src') ?? img.attr('src') ?? undefined;
+    const href = img.closest('a[href]').attr('href');
+    return { imageUrl: src, href };
+  };
 
-    if (role) {
+  const normalizedDocumentText = doc.text().replace(/\s+/g, ' ').trim();
+  const characterSectionText = normalizedDocumentText.match(/Characters?\s*(?:&|and)\s*Voice Actors?\s+(.+?)(?=\s+History\b|\s+Watch\s+)/i)?.[1];
+  if (characterSectionText) {
+    const parts = characterSectionText.split(/\b(Main|Supporting|Japanese|English)\b/i);
+    for (let i = 1; i < parts.length; i++) {
+      const marker = parts[i]?.trim().toLowerCase();
+      if (marker !== 'main' && marker !== 'supporting') continue;
+      const characterName = clean(parts[i - 1]);
+      const voiceName = clean(parts[i + 1]);
+      const languageToken = parts[i + 2]?.trim();
+      const language = /^(Japanese|English)$/i.test(languageToken ?? '') ? languageToken : undefined;
+      if (!characterName || characterName.length > 120 || characterName.toLowerCase().includes(originLabel)) continue;
+      const characterImage = personImage(characterName);
       const character: CharacterData = {
-        sourceId: sourceId('character', href ? client.absolute(href) : `/character/${encodeURIComponent(alt)}/`),
-        name: alt,
-        imageUrl,
-        role,
+        sourceId: sourceId('character', characterImage.href ? client.absolute(characterImage.href) : `/character/${encodeURIComponent(characterName)}/`),
+        name: characterName,
+        imageUrl: characterImage.imageUrl,
+        role: marker === 'main' ? 'Main' : 'Supporting',
         voiceActors: [],
       };
-      const inlineVoice = txt.match(/\b(?:Main|Supporting)\b\s+(.+?)\s+\b(Japanese|English)\b/i);
-      const inlineName = clean(inlineVoice?.[1]);
-      if (inlineName && inlineName.toLowerCase() !== alt.toLowerCase() && inlineName.length < 120) {
-        character.voiceActors!.push({ name: inlineName, language: inlineVoice?.[2], sourceId: `voice:${inlineName.toLowerCase()}:${(inlineVoice?.[2] ?? 'unknown').toLowerCase()}` });
-      }
-      const existing = characters.find(c => c.name.toLowerCase() === character.name.toLowerCase());
-      if (!existing) {
-        characters.push(character);
-        lastCharacter = character;
-      } else {
-        lastCharacter = existing;
-      }
-      continue;
-    }
-
-    if (language && lastCharacter && alt.toLowerCase() !== lastCharacter.name.toLowerCase()) {
-      lastCharacter.voiceActors ??= [];
-      if (!lastCharacter.voiceActors.some(v => v.name.toLowerCase() === alt.toLowerCase() && v.language === language)) {
-        lastCharacter.voiceActors.push({
-          sourceId: href ? sourceId('voice', client.absolute(href)) : `voice:${alt.toLowerCase()}:${language.toLowerCase()}`,
-          name: alt,
+      if (voiceName && language && voiceName.length < 120 && voiceName.toLowerCase() !== characterName.toLowerCase()) {
+        const voiceImage = personImage(voiceName);
+        character.voiceActors!.push({
+          sourceId: voiceImage.href ? sourceId('voice', client.absolute(voiceImage.href)) : `voice:${voiceName.toLowerCase()}:${language.toLowerCase()}`,
+          name: voiceName,
           language,
-          imageUrl,
+          imageUrl: voiceImage.imageUrl,
         });
+        i += 2;
+      }
+      if (!characters.some(c => c.name.toLowerCase() === character.name.toLowerCase())) characters.push(character);
+    }
+  }
+
+  if (!characters.length) {
+    const characterHeading = doc.find('h2,h3,h4').filter((_, el) => /characters?\s*(?:&|and)?\s*voice actors?/i.test($(el).text())).first();
+    let characterImages = characterHeading.length ? characterHeading.nextUntil('h2,h3,h4').find('img').toArray() : [];
+    if (!characterImages.length) {
+      characterImages = doc.find('img').toArray().filter(img => {
+        let node = $(img).parent();
+        for (let depth = 0; depth < 5 && node.length; depth++, node = node.parent()) {
+          const txt = clean(node.text());
+          if (txt && txt.length < 600 && /\b(Main|Supporting|Japanese|English)\b/i.test(txt)) return true;
+        }
+        return false;
+      });
+    }
+    let lastCharacter: CharacterData | undefined;
+    for (const img of characterImages) {
+      const el = $(img);
+      const alt = clean(el.attr('alt'));
+      if (!alt || alt === title || alt.toLowerCase().includes(originLabel)) continue;
+      let node = el.parent();
+      let txt: string | undefined;
+      for (let depth = 0; depth < 6 && node.length; depth++, node = node.parent()) {
+        const candidate = clean(node.text());
+        if (candidate && candidate.length < 600 && /\b(Main|Supporting|Japanese|English)\b/i.test(candidate)) { txt = candidate; break; }
+      }
+      if (!txt) continue;
+      const role = /\bMain\b/i.test(txt) ? 'Main' : /\bSupporting\b/i.test(txt) ? 'Supporting' : undefined;
+      const language = /\bEnglish\b/i.test(txt) ? 'English' : /\bJapanese\b/i.test(txt) ? 'Japanese' : undefined;
+      const imageUrl = el.attr('data-src') ?? el.attr('data-lazy-src') ?? el.attr('src') ?? undefined;
+      const href = el.closest('a[href]').attr('href');
+      if (role) {
+        const character: CharacterData = { sourceId: sourceId('character', href ? client.absolute(href) : `/character/${encodeURIComponent(alt)}/`), name: alt, imageUrl, role, voiceActors: [] };
+        if (!characters.some(c => c.name.toLowerCase() === character.name.toLowerCase())) { characters.push(character); lastCharacter = character; }
+        else lastCharacter = characters.find(c => c.name.toLowerCase() === character.name.toLowerCase());
+      } else if (language && lastCharacter && alt.toLowerCase() !== lastCharacter.name.toLowerCase()) {
+        lastCharacter.voiceActors ??= [];
+        if (!lastCharacter.voiceActors.some(v => v.name.toLowerCase() === alt.toLowerCase() && v.language === language)) {
+          lastCharacter.voiceActors.push({ sourceId: href ? sourceId('voice', client.absolute(href)) : `voice:${alt.toLowerCase()}:${language.toLowerCase()}`, name: alt, language, imageUrl });
+        }
       }
     }
   }
 
   const latestEpisode = uniqueEpisodes.length ? Math.max(...uniqueEpisodes.map(e => e.episodeNumber)) : undefined;
   const ratingText = bodyText.match(/Rating\s*([0-9]+(?:\.[0-9]+)?)/i)?.[1];
-  const metadata = {
-    title,
-    titleEnglish,
-    titleJapanese,
-    alternativeTitles,
-    description,
-    poster,
-    banner,
-    type,
-    status,
-    season,
-    year: parseYear(released),
-    rating: toNumber(ratingText),
-    duration,
-    totalEpisodes: toNumber(episodesRaw),
-    latestEpisode,
-    genres,
-    studios,
-    sourceUpdatedAt: toDate(clean(updatedRaw)),
-  };
+  const metadata = { title, titleEnglish, titleJapanese, alternativeTitles, description, poster, banner, type, status, season, year: parseYear(released), rating: toNumber(ratingText), duration, totalEpisodes: toNumber(episodesRaw), latestEpisode, genres, studios, sourceUpdatedAt: toDate(clean(updatedRaw)) };
 
   return {
-    sourceId: sourceId('anime', url),
-    sourceUrl: url,
-    slug: slugFromUrl(url),
-    title,
-    titleEnglish,
-    titleJapanese,
-    alternativeTitles,
-    description,
-    posterUrl: poster ? client.absolute(poster) : undefined,
-    bannerUrl: banner ? client.absolute(banner) : undefined,
-    type,
-    status,
-    season,
-    year: parseYear(released),
-    rating: toNumber(ratingText),
-    duration,
-    totalEpisodes: toNumber(episodesRaw),
-    latestEpisode,
-    genres,
-    studios,
-    characters,
-    relatedAnimeUrls,
-    episodeRefs: uniqueEpisodes,
-    sourceUpdatedAt: toDate(clean(updatedRaw)),
-    metadataHash: await sha256(metadata),
-    contentHash: await sha256({ metadata, episodeRefs: uniqueEpisodes, relatedAnimeUrls }),
+    sourceId: sourceId('anime', url), sourceUrl: url, slug: slugFromUrl(url), title, titleEnglish, titleJapanese, alternativeTitles, description,
+    posterUrl: poster ? client.absolute(poster) : undefined, bannerUrl: banner ? client.absolute(banner) : undefined,
+    type, status, season, year: parseYear(released), rating: toNumber(ratingText), duration, totalEpisodes: toNumber(episodesRaw), latestEpisode,
+    genres, studios, characters, relatedAnimeUrls, episodeRefs: uniqueEpisodes, sourceUpdatedAt: toDate(clean(updatedRaw)),
+    metadataHash: await sha256(metadata), contentHash: await sha256({ metadata, episodeRefs: uniqueEpisodes, relatedAnimeUrls }),
   };
 }
