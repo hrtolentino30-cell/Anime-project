@@ -8,4 +8,6 @@ await page.goto(base,{waitUntil:"domcontentloaded",timeout:60000});await page.wa
 const latest=await page.locator("a").evaluateAll(as=>as.map(a=>({text:(a.textContent||"").replace(/\s+/g," ").trim(),href:a.href})).filter(x=>x.href&&/animepahe\.pw/.test(x.href)&&x.text).slice(0,250));
 console.log("ANIMEPAHE_LATEST_JSON="+JSON.stringify(latest));
 console.log("ANIMEPAHE_NETWORK_JSON="+JSON.stringify(hits.slice(-150)));
+const endpoint=(process.env.ANIMEPAHE_DETECT_URL||"").trim(), secret=(process.env.MEDIA_BRIDGE_SECRET||"").replace(/[^\\x20-\\x7E]/g,"").trim();
+if(endpoint&&secret){const items=latest.filter(x=>/episode|ep\\.?\\s*\\d/i.test(x.text)||/episode|play/i.test(x.href)).map(x=>({title:x.text,url:x.href})); const r=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json","x-media-bridge-secret":secret},body:JSON.stringify({items})}); console.log("ANIMEPAHE_DETECT_STATUS="+r.status); console.log("ANIMEPAHE_DETECT_RESPONSE="+(await r.text()).slice(0,4000)); if(!r.ok)process.exitCode=1;} else {console.log("ANIMEPAHE_DETECT_SKIPPED=missing configuration");}
 await browser.close();
