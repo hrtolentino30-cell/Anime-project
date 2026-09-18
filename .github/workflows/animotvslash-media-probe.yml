@@ -6,7 +6,7 @@ on:
       episode_url:
         description: "Optional episode URL; leave blank to process the next queued new episode"
         required: false
-        default: "https://animotvslash.org/smoking-behind-the-supermarket-with-you-episode-11/"
+        default: ""
 
   push:
     branches: [main]
@@ -39,10 +39,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Resolve player candidates
         env:
-          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/smoking-behind-the-supermarket-with-you-episode-11/' }}
+          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
           FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
           MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
           FACEBOOK_UPLOAD_PROXY_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-upload-proxy
         run: node scripts/animotvslash-media-probe.mjs
 
-# controlled Smoking Behind the Supermarket E11 test
