@@ -1,0 +1,1 @@
+const s=document.querySelector("#s"),m=document.querySelector("#m");chrome.storage.local.get(["animoriBridgeSecret"],x=>{if(x.animoriBridgeSecret)s.placeholder="Secret already saved"});document.querySelector("#b").onclick=()=>chrome.storage.local.set({animoriBridgeSecret:s.value.trim()},()=>{s.value="";m.textContent="Saved."});
