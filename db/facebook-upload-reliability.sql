@@ -108,3 +108,4 @@ create trigger trg_queue_new_episode_for_facebook after insert or update of air_
 alter function public.touch_facebook_sync_item() set search_path='';
 create or replace function public.claim_facebook_episode_queue() returns table(episode_id uuid,episode_url text,attempts integer)
 language plpgsql security invoker set search_path='' as $$ begin raise exception 'Legacy upload client retired; use claim_facebook_upload'; end $$;
+alter table public.facebook_episode_queue add column if not exists upload_bytes bigint not null default 0, add column if not exists file_bytes bigint, add column if not exists progress_at timestamptz;

@@ -36,6 +36,10 @@ Deno.serve(async (req: Request) => {
     if (phase === "status") return Response.json(await status(url.searchParams.get("video_id") || ""));
     const episodeId = req.headers.get("x-episode-id"), attempt = Number(req.headers.get("x-upload-attempt"));
     if (!episodeId || !Number.isInteger(attempt) || attempt < 1) return Response.json({error:"Current queue lease required"},{status:409});
+    const progress = async (data: unknown) => {
+      const result = await fetch(`${SU}/rest/v1/facebook_episode_queue?episode_id=eq.${encodeURIComponent(episodeId)}&attempts=eq.${attempt}&status=eq.processing`,{method:'PATCH',headers:{apikey:SK,authorization:`Bearer ${SK}`,'content-type':'application/json'},body:JSON.stringify(data)});
+      if (!result.ok) console.error('Could not persist upload progress',result.status);
+    };
     const transition = (action: string,data: unknown={}) => rpc("facebook_upload_transition",{p_episode_id:episodeId,p_attempt:attempt,p_action:action,p_data:data});
     const r = await fetch(`${SU}/rest/v1/facebook_episode_queue?episode_id=eq.${encodeURIComponent(episodeId)}&select=*`,{headers:{apikey:SK,authorization:`Bearer ${SK}`}});
     if (!r.ok) throw new Error("Queue lookup failed");
@@ -49,6 +53,7 @@ Deno.serve(async (req: Request) => {
       const result = await graph(`${PID}/videos`,new URLSearchParams({access_token:PT,upload_phase:"start",file_size:String(data.file_size)}));
       if (!result.video_id || !result.upload_session_id) throw new Error("Incomplete upload session response");
       await transition("session",result);
+      await progress({file_bytes:data.file_size,progress_at:new Date().toISOString()});
       return Response.json(result);
     }
     if (phase === "transfer") {
@@ -57,7 +62,9 @@ Deno.serve(async (req: Request) => {
       body.set("access_token",PT); body.set("upload_phase","transfer"); body.set("upload_session_id",job.upload_session_id);
       body.set("start_offset",url.searchParams.get("start_offset") || "0");
       body.set("video_file_chunk",new Blob([await req.arrayBuffer()]),"chunk.bin");
-      return Response.json(await graph(`${PID}/videos`,body));
+      const result = await graph(`${PID}/videos`,body);
+      await progress({upload_bytes:Number(result.start_offset || 0),progress_at:new Date().toISOString()});
+      return Response.json(result);
     }
     if (phase === "finish") {
       if (!job.upload_session_id) throw new Error("Missing upload session");
