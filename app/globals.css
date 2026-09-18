@@ -9,3 +9,5 @@
 .nav .brandLockup{width:174px}
 .footer .brandLockup{width:190px}
 @media(max-width:720px){.nav .brandLockup{width:148px}.footer .brandLockup{width:176px}}
+
+.searchPrompt .chips button{background:#171d29;border:1px solid #293244;border-radius:999px;padding:6px 10px;font-size:12px;color:#cdd4df;cursor:pointer}.searchPrompt .chips button:hover,.searchPrompt .chips button:focus-visible{border-color:#6d5bd0;color:#fff;outline:none}
