@@ -3,12 +3,14 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { ChevronLeft,ChevronRight } from 'lucide-react';
 import { getWatchData } from '@/lib/data';
+import { cache } from 'react';
 import { Player } from '@/components/Player';
 export const dynamic='force-dynamic';
-export async function generateMetadata({params}:{params:Promise<{episodeId:string}>}):Promise<Metadata>{const {episodeId}=await params,data=await getWatchData(episodeId);if(!data)return{title:'Episode not found',robots:{index:false,follow:false}};const e=data.episode,a=e.anime,title=`${a?.title??'Anime'} Episode ${e.episode_number}`,description=(e.title||a?.description||`Watch ${title} on Animori.`).replace(/\s+/g,' ').slice(0,160);return{title,description,alternates:{canonical:`/watch/${episodeId}`},robots:{index:true,follow:true,'max-video-preview':-1},openGraph:{type:'video.episode',title,description,url:`/watch/${episodeId}`,images:a?.poster_url?[{url:a.poster_url,alt:`${a.title} poster`}]:undefined}}}
+const getPageWatchData=cache((episodeId:string)=>getPageWatchData(episodeId));
+export async function generateMetadata({params}:{params:Promise<{episodeId:string}>}):Promise<Metadata>{const {episodeId}=await params,data=await getPageWatchData(episodeId);if(!data)return{title:'Episode not found',robots:{index:false,follow:false}};const e=data.episode,a=e.anime,title=`${a?.title??'Anime'} Episode ${e.episode_number}`,description=(e.title||a?.description||`Watch ${title} on Animori.`).replace(/\s+/g,' ').slice(0,160);return{title,description,alternates:{canonical:`/watch/${episodeId}`},robots:{index:true,follow:true,'max-video-preview':-1},openGraph:{type:'video.episode',title,description,url:`/watch/${episodeId}`,images:a?.poster_url?[{url:a.poster_url,alt:`${a.title} poster`}]:undefined}}}
 export default async function WatchPage({params}:{params:Promise<{episodeId:string}>}){
   const {episodeId}=await params;
-  const data=await getWatchData(episodeId);
+  const data=await getPageWatchData(episodeId);
   if(!data)notFound();
   const {episode,sources,siblings,progress,userId}=data;
   const index=siblings.findIndex((s:any)=>s.id===episode.id);
