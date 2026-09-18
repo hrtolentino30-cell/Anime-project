@@ -32,7 +32,7 @@ const videos = await page.locator("video").evaluateAll(els => els.flatMap(v => [
 
 console.log("EPISODE_URL="+pageUrl);
 for(const u of [...new Set([...frames,...videos,...hits])]) console.log("MEDIA_CANDIDATE="+u);
-const pageTitle=await page.title();
+const pageTitle=(await page.title()).replace(/\s*[-|–—:]?\s*ANIMOTVSLASH\s*$/i,"").trim();
 await browser.close();
 
 // Prefer the HLS playback source. It carries the real adaptive-quality streams and audio.
