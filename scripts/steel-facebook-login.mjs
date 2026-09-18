@@ -7,7 +7,7 @@ const create = await fetch(`${STEEL_API}/sessions`, {
   method: "POST", headers,
   body: JSON.stringify({
     persistProfile: true,
-    timeout: 900000,
+    timeout: 840000,
     debugConfig: { interactive: true }
   })
 });
