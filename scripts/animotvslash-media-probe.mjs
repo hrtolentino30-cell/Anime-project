@@ -2,7 +2,12 @@ import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
 import { statSync, openSync, readSync, closeSync } from "node:fs";
 
-const pageUrl = process.env.ANIMOTV_EPISODE_URL || "https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/";
+const proxy=(process.env.FACEBOOK_UPLOAD_PROXY_URL||"").trim();
+const oidcBase=process.env.ACTIONS_ID_TOKEN_REQUEST_URL||"", oidcReq=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN||"";
+async function oidc(){const tr=await fetch(oidcBase+(oidcBase.includes("?")?"&":"?")+"audience=animori-facebook-upload",{headers:{authorization:"Bearer "+oidcReq}});if(!tr.ok)throw new Error("GitHub OIDC token request failed "+tr.status);return (await tr.json()).value}
+let queueEpisodeId="";
+let pageUrl=(process.env.ANIMOTV_EPISODE_URL||"").trim();
+if(!pageUrl){if(!proxy||!oidcBase||!oidcReq)throw new Error("Automatic queue mode requires upload proxy and GitHub OIDC");const jwt=await oidc();const nr=await fetch(proxy+"?phase=next",{headers:{authorization:"Bearer "+jwt}});const nj=await nr.json();if(!nr.ok)throw new Error("Queue claim failed "+JSON.stringify(nj));if(!nj.job){console.log("FACEBOOK_QUEUE_EMPTY");process.exit(0)}queueEpisodeId=nj.job.episode_id;pageUrl=nj.job.episode_url;console.log("FACEBOOK_QUEUE_CLAIMED="+queueEpisodeId)}
 const browser = await chromium.launch({headless:true});
 const page = await browser.newPage();
 const hits = new Set();
@@ -58,12 +63,8 @@ if(hls) {
       process.exitCode=1;
     } else {
       console.log("FACEBOOK_MEDIA_READY="+out+" bytes="+statSync(out).size+" resolution="+video.width+"x"+video.height);
-      const proxy=(process.env.FACEBOOK_UPLOAD_PROXY_URL||"").trim();
-      const oidcBase=process.env.ACTIONS_ID_TOKEN_REQUEST_URL||"", oidcReq=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN||"";
       if(proxy&&oidcBase&&oidcReq){
-        const tr=await fetch(oidcBase+(oidcBase.includes("?")?"&":"?")+"audience=animori-facebook-upload",{headers:{authorization:"Bearer "+oidcReq}});
-        if(!tr.ok) throw new Error("GitHub OIDC token request failed "+tr.status);
-        const jwt=(await tr.json()).value;
+        const jwt=await oidc();
         const size=statSync(out).size;
         let r=await fetch(proxy+"?phase=start",{method:"POST",headers:{authorization:"Bearer "+jwt,"content-type":"application/json"},body:JSON.stringify({file_size:size})});
         let state=await r.json(); if(!r.ok) throw new Error("Facebook upload start failed "+JSON.stringify(state));
@@ -88,7 +89,7 @@ if(hls) {
           const sj=await sr.json().catch(()=>({}));
           console.log("FACEBOOK_STATUS_CHECK_"+attempt+"="+JSON.stringify(sj));
           const processing=sj?.status?.video_status||sj?.status?.processing_phase?.status||"";
-          if(sr.ok && sj.published===true && !/processing|uploading|error|failed/i.test(String(processing))){verified=true;console.log("FACEBOOK_PUBLISHED_VIDEO_ID="+videoId);if(sj.permalink_url)console.log("FACEBOOK_PERMALINK="+sj.permalink_url);break;}
+          if(sr.ok && sj.published===true && !/processing|uploading|error|failed/i.test(String(processing))){verified=true;console.log("FACEBOOK_PUBLISHED_VIDEO_ID="+videoId);if(sj.permalink_url)console.log("FACEBOOK_PERMALINK="+sj.permalink_url);if(queueEpisodeId){const cr=await fetch(proxy+"?phase=complete",{method:"POST",headers:{authorization:"Bearer "+jwt,"content-type":"application/json"},body:JSON.stringify({episode_id:queueEpisodeId,video_id:videoId})});if(!cr.ok)throw new Error("Queue completion update failed")}break;}
           if(/error|failed/i.test(String(processing)))throw new Error("Facebook post-upload processing failed "+JSON.stringify(sj));
         }
         if(!verified)throw new Error("Facebook upload accepted but public/published verification timed out");
