@@ -10,7 +10,7 @@ on:
       episode_url:
         description: "Public ANIMOTVSLASH episode URL"
         required: false
-        default: "https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/"
+        default: "https://animotvslash.org/hunter-x-hunter-2011-episode-4/"
 
 permissions:
   contents: read
@@ -28,7 +28,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Resolve player candidates
         env:
-          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/' }}
+          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/hunter-x-hunter-2011-episode-4/' }}
           FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
           MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
         run: node scripts/animotvslash-media-probe.mjs
