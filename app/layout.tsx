@@ -7,9 +7,10 @@ import { Header } from '@/components/Header';
 import { Brand } from '@/components/Brand';
 import Link from 'next/link';
 import Script from 'next/script';
+import { Analytics } from '@/components/Analytics';
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://animori.bond'),
+  metadataBase: new URL('https://www.animori.bond'),
   title: { default: 'Animori', template: '%s · Animori' },
   description: 'Find your next anime. Explore new episodes, save your favorites, and pick up where you left off.',
   applicationName: 'Animori',
@@ -22,5 +23,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#0c0d0f' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><a href="#main-content" className="skipLink">Skip to content</a><Header/><main id="main-content" tabIndex={-1}>{children}</main><footer className="footer"><Link href="/" aria-label="Animori home"><Brand/></Link><nav aria-label="Footer navigation"><Link href="/browse">Browse anime</Link><Link href="/schedule">Release schedule</Link><Link href="/my-list">My List</Link><a href="mailto:hello@animori.bond">Contact</a></nav></footer><Script id="cloudflare-web-analytics" type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"622ad87d5197446aaa22d280f004c6c2"}' strategy="afterInteractive"/></body></html>;
+  return <html lang="en"><body><Analytics/><a href="#main-content" className="skipLink">Skip to content</a><Header/><main id="main-content" tabIndex={-1}>{children}</main><footer className="footer"><Link href="/" aria-label="Animori home"><Brand/></Link><nav aria-label="Footer navigation"><Link href="/browse">Browse anime</Link><Link href="/schedule">Release schedule</Link><Link href="/my-list">My List</Link><a href="mailto:hello@animori.bond">Contact</a></nav></footer><Script id="cloudflare-web-analytics" type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"622ad87d5197446aaa22d280f004c6c2"}' strategy="afterInteractive"/></body></html>;
 }
