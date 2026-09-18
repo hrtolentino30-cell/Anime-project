@@ -33,7 +33,12 @@ Deno.serve(async (req: Request) => {
   try {
     const url = new URL(req.url), phase = url.searchParams.get("phase");
     if (phase === "next") return Response.json({job:await rpc("claim_facebook_upload",{p_episode_url:url.searchParams.get("episode_url") || null})});
-    if (phase === "status") return Response.json(await status(url.searchParams.get("video_id") || ""));
+    if (phase === "status") {
+      const id = url.searchParams.get("video_id") || "";
+      const video = await status(id);
+      await fetch(`${SU}/rest/v1/facebook_episode_queue?destination_video_id=eq.${encodeURIComponent(id)}`,{method:'PATCH',headers:{apikey:SK,authorization:`Bearer ${SK}`,'content-type':'application/json'},body:JSON.stringify({meta_status:video,checked_at:new Date().toISOString()})});
+      return Response.json(video);
+    }
     const episodeId = req.headers.get("x-episode-id"), attempt = Number(req.headers.get("x-upload-attempt"));
     if (!episodeId || !Number.isInteger(attempt) || attempt < 1) return Response.json({error:"Current queue lease required"},{status:409});
     const progress = async (data: unknown) => {
