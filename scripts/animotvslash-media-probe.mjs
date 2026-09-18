@@ -30,12 +30,12 @@ const videos = await page.locator("video").evaluateAll(els => els.flatMap(v => [
 
 console.log("EPISODE_URL="+pageUrl);
 for(const u of [...new Set([...frames,...videos,...hits])]) console.log("MEDIA_CANDIDATE="+u);
-await browser.close();
+const pageTitle=await page.title();\nawait browser.close();
 
 // Emit machine-readable direct media URLs for downstream ingestion.
 const candidates=[...new Set([...videos,...hits])].filter(u=>/\.m3u8(?:\?|$)|\.mp4(?:\?|$)/i.test(u));
 console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));
-const directMp4=candidates.find(u=>/\\.mp4(?:\\?|$)/i.test(u));
+const directMp4=candidates.find(u=>/\.mp4(?:\?|$)/i.test(u));
 if(directMp4) {
   console.log("DIRECT_MP4="+directMp4);
   const ingestUrl=process.env.FACEBOOK_INGEST_URL;
@@ -43,7 +43,7 @@ if(directMp4) {
   const destinationSource=process.env.ANIMORI_SYNC_SOURCE_URL || "https://animotvslash.org/";
   if (ingestUrl && ingestSecret) {
     const postId = new URL(pageUrl).pathname.replace(/\/$/,"").split("/").filter(Boolean).pop() || Buffer.from(pageUrl).toString("base64url");
-    const payload={source_url:destinationSource,url:pageUrl,post_id:postId,caption:await page.title(),media_url:directMp4,content_fingerprint:postId};
+    const payload={source_url:destinationSource,url:pageUrl,post_id:postId,caption:pageTitle,media_url:directMp4,content_fingerprint:postId};
     const ir=await fetch(ingestUrl,{method:"POST",headers:{"content-type":"application/json","x-ingest-secret":ingestSecret},body:JSON.stringify(payload)});
     console.log("FACEBOOK_INGEST_STATUS="+ir.status);
     if(!ir.ok) console.log("FACEBOOK_INGEST_ERROR="+(await ir.text()).slice(0,500));
