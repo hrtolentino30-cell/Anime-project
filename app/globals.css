@@ -2,3 +2,10 @@
 
 /* Dense admin control center */
 .adminIntro{margin-bottom:14px;display:flex;align-items:baseline;gap:12px;max-width:none}.adminIntro h1{font-size:30px;margin:0}.adminIntro p{margin:0;color:var(--muted);font-size:11px}.adminPage{font-variant-numeric:tabular-nums}.adminKicker{display:flex;align-items:center;justify-content:space-between;margin:10px 0 6px;border-bottom:1px solid #1b2330;padding-bottom:5px}.adminKicker strong{text-transform:uppercase;letter-spacing:.12em;font-size:9px;color:#c4b5fd}.adminKicker span{font-size:9px;color:var(--muted)}.adminPage .statsGrid{gap:6px}.adminPage .stat{border-radius:8px;padding:9px 10px;min-height:55px}.adminPage .stat span{font-size:8px}.adminPage .stat strong{font-size:15px;margin-top:4px}.adminPage .adminControls{border-radius:9px;padding:9px;margin-top:8px}.adminPage .adminSection{margin-top:16px}.adminPage .sectionHead{margin-bottom:7px;align-items:center}.adminPage .sectionHead h2{font-size:14px}.adminPage .sectionHead>span{font-size:9px}.adminPage .adminTable{border-radius:8px}.adminPage .adminRow{grid-template-columns:72px minmax(220px,1fr) 62px 138px 54px;padding:5px 8px;font-size:10px;min-height:29px}.adminPage .adminRow.head{font-size:8px}.adminPage .status{padding:2px 5px;font-size:9px}.adminPage .tinyBtn{padding:3px 6px;font-size:9px}.adminPage .runGrid{grid-template-columns:repeat(4,1fr);gap:6px}.adminPage .runGrid article{padding:8px;border-radius:8px}.adminPage .eventList{gap:2px}.adminPage .eventList article{padding:5px 8px;border-radius:6px}.adminPage .eventType{width:95px;font-size:8px}.adminPage .eventList strong,.adminPage .eventList small{font-size:9px}@media(max-width:720px){.adminIntro{display:block}.adminIntro p{margin-top:5px}.adminPage .adminRow{grid-template-columns:62px 1fr 48px}.adminPage .runGrid{grid-template-columns:1fr 1fr}}
+
+/* Animori approved brand system */
+.brand{height:44px;display:flex;align-items:center;gap:0;letter-spacing:normal}
+.brandLockup{width:170px;height:auto;display:block}
+.nav .brandLockup{width:174px}
+.footer .brandLockup{width:190px}
+@media(max-width:720px){.nav .brandLockup{width:148px}.footer .brandLockup{width:176px}}
