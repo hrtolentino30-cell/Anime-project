@@ -3,7 +3,13 @@ name: ANIMOTVSLASH discovery
 on:
   workflow_dispatch:
   schedule:
-    - cron: "7,22,37,52 * * * *"
+    # Normal cadence: every 15 minutes outside the Philippine peak window.
+    # 21:00-02:00 Asia/Manila == 13:00-18:00 UTC (Philippines is UTC+8 year-round).
+    - cron: "7,22,37,52 0-12,19-23 * * *"
+    # Peak cadence: every 5 minutes from 21:00 through 01:59 PHT.
+    - cron: "*/5 13-17 * * *"
+    # 02:00 PHT boundary check, then normal cadence resumes after 02:00.
+    - cron: "0 18 * * *"
 
 permissions:
   contents: read
