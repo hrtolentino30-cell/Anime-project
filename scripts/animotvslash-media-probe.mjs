@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import { spawnSync } from "node:child_process";
-import { statSync } from "node:fs";
+import { statSync, createReadStream } from "node:fs";
 
 const pageUrl = process.env.ANIMOTV_EPISODE_URL || "https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/";
 const browser = await chromium.launch({headless:true});
@@ -58,6 +58,23 @@ if(hls) {
       process.exitCode=1;
     } else {
       console.log("FACEBOOK_MEDIA_READY="+out+" bytes="+statSync(out).size+" resolution="+video.width+"x"+video.height);
+      const pageId=(process.env.META_PAGE_ID||"").trim();
+      const pageToken=(process.env.META_PAGE_ACCESS_TOKEN||"").replace(/[^\\x20-\\x7E]/g,"").trim();
+      const graphVersion=(process.env.META_GRAPH_VERSION||"v26.0").trim();
+      if(pageId && pageToken) {
+        const { default: FormData } = await import("form-data");
+        const form=new FormData();
+        form.append("access_token",pageToken);
+        form.append("description",pageTitle);
+        form.append("source",createReadStream(out),{filename:"animori-episode.mp4",contentType:"video/mp4",knownLength:statSync(out).size});
+        const upload=await fetch(`https://graph-video.facebook.com/${graphVersion}/${pageId}/videos`,{method:"POST",headers:form.getHeaders(),body:form,duplex:"half"});
+        const responseText=await upload.text();
+        console.log("FACEBOOK_DIRECT_UPLOAD_STATUS="+upload.status);
+        console.log("FACEBOOK_DIRECT_UPLOAD_RESPONSE="+responseText.slice(0,500));
+        if(!upload.ok) process.exitCode=1;
+      } else {
+        console.log("FACEBOOK_DIRECT_UPLOAD_SKIPPED=missing Meta runner secrets");
+      }
     }
   }
 } else {
