@@ -66,7 +66,7 @@ try {
     // Interact inside embedded frames: the old worker only clicked the outer document.
     const deadline = Date.now() + 65000;
     const clicked = new Set();
-    while (!hits.size && Date.now() < deadline) {
+    while (Date.now() < deadline) {
       for (const frame of page.frames()) {
         if (frame.isDetached()) continue;
         await frame.locator('video').evaluateAll(videos => videos.forEach(v => { v.muted=true; v.play().catch(()=>{}); })).catch(()=>{});
@@ -85,9 +85,11 @@ try {
     }
     console.log('PLAYER_FRAMES=' + JSON.stringify(page.frames().map(f=>f.url())));
     if (!hits.size) throw new Error('No full HLS source found after activating embedded players');
+    const candidateRank = u => /rumble\.com\/hls-vod\//i.test(u) ? 0 : /mega\/fetch\.nexabloom\.top/i.test(u) ? 2 : 1;
+    console.log('MEDIA_CANDIDATES=' + JSON.stringify([...hits.keys()].map(u=>({host:new URL(u).host,rank:candidateRank(u)}))));
     const out='/tmp/facebook-upload.mp4';
     let ready=false;
-    for (const [hls,headers] of hits) {
+    for (const [hls,headers] of [...hits.entries()].sort((a,b)=>candidateRank(a[0])-candidateRank(b[0]))) {
       // Replay the exact successful player request context. The CDN checks more than
       // Referer/User-Agent; preserving the browser's complete safe request header set
       // avoids stripping player-specific authorization signals.
