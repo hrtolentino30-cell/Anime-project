@@ -43,7 +43,7 @@ const previewMp4=candidates.find(u=>/\.mp4(?:\?|$)/i.test(u));
 if(hls) {
   console.log("SOURCE_HLS="+hls);
   const out="/tmp/facebook-upload.mp4";
-  const ff=spawnSync("ffmpeg",["-y","-i",hls,"-map","0:v:0","-map","0:a:0","-c","copy","-movflags","+faststart",out],{encoding:"utf8",timeout:240000});
+  const ff=spawnSync("ffmpeg",["-y","-i",hls,"-map","0:v:0","-map","0:a:0","-c:v","libx264","-preset","medium","-crf","23","-maxrate","5M","-bufsize","10M","-c:a","aac","-b:a","160k","-ac","2","-movflags","+faststart",out],{encoding:"utf8",timeout:240000});
   if(ff.status!==0) {
     console.error("FFMPEG_REMUX_FAILED="+(ff.stderr||"").slice(-1500));
     process.exitCode=1;
