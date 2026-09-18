@@ -26,7 +26,7 @@ jobs:
           node-version: "22"
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
-      - name: Resolve player candidates
+      - name: Install ffmpeg\n        run: sudo apt-get update && sudo apt-get install -y ffmpeg\n      - name: Resolve player candidates
         env:
           ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/the-exiled-heavy-knight-knows-how-to-game-the-system-episode-12/' }}
           FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
