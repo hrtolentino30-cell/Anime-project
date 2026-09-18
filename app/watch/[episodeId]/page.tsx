@@ -16,7 +16,7 @@ export default async function WatchPage({params}:{params:Promise<{episodeId:stri
   const index=siblings.findIndex((s:any)=>s.id===episode.id);
   const prev=siblings[index-1],next=siblings[index+1];
   const anime=episode.anime;
-  const jsonLd={'@context':'https://schema.org','@type':'TVEpisode',name:`${anime?.title??'Anime'} Episode ${episode.episode_number}`,episodeNumber:Number(episode.episode_number),partOfSeries:anime?{'@type':'TVSeries',name:anime.title,url:`https://animori.bond/anime/${anime.slug}`}:undefined,url:`https://animori.bond/watch/${episode.id}`};
+  const jsonLd={'@context':'https://schema.org','@type':'TVEpisode',name:`${anime?.title??'Anime'} Episode ${episode.episode_number}`,episodeNumber:Number(episode.episode_number),partOfSeries:anime?{'@type':'TVSeries',name:anime.title,url:`https://www.animori.bond/anime/${anime.slug}`}:undefined,url:`https://www.animori.bond/watch/${episode.id}`};
   return <div className="watchPage pageWidth"><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}}/>
     <div className="watchHead"><div><span className="eyebrow">{anime?.title}</span><h1>Episode {episode.episode_number}{episode.title?` · ${episode.title.replace(anime?.title??'','').trim()}`:''}</h1></div><div className="episodeNav">{prev&&<Link href={`/watch/${prev.id}`}><ChevronLeft/>Previous</Link>}{next&&<Link href={`/watch/${next.id}`}>Next<ChevronRight/></Link>}</div></div>
     <Player episodeId={episode.id} animeId={episode.anime_id} sources={sources as any} userId={userId} initialPosition={Number(progress?.position_seconds??0)} nextEpisodeId={next?.id}/>
