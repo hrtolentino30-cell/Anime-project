@@ -25,5 +25,6 @@
   ],
   "action": {
     "default_title": "Animori Source Bridge"
-  }
+  },
+  "options_page": "options.html"
 }
