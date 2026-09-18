@@ -9,7 +9,7 @@ export function Player({episodeId,animeId,sources,userId,initialPosition=0,nextE
   const [notice,setNotice]=useState('');
   const [saveError,setSaveError]=useState('');
   const [autoNext,setAutoNext]=useState(true);
-  const videoRef=useRef<HTMLVideoElement|null>(null);const milestones=useRef(new Set<number>());
+  const videoRef=useRef<HTMLVideoElement|null>(null);const milestones=useRef(new Set<number>());const playbackKey=useRef('');
   const source=useMemo(()=>sources.find(s=>s.id===selected)??sources[0],[sources,selected]);
 
   useEffect(()=>{if(!sources.some(s=>s.id===selected))setSelected(sources[0]?.id??'')},[sources,selected]);
@@ -20,7 +20,7 @@ export function Player({episodeId,animeId,sources,userId,initialPosition=0,nextE
     let hls:{destroy:()=>void}|undefined;let cancelled=false;const sourceIndex=sources.findIndex(s=>s.id===source.id);
     const failover=()=>{if(cancelled)return;const next=sources[sourceIndex+1];if(next){setNotice(`Source unavailable. Trying ${next.server_name}…`);setSelected(next.id)}else setNotice('This episode has no other healthy source right now.')};
     video.pause();video.removeAttribute('src');video.load();setNotice('');
-    const onMeta=()=>{milestones.current.clear();void trackPlayback('play_start',animeId,episodeId,source.id,userId);if(initialPosition>0&&Number.isFinite(video.duration)&&initialPosition<video.duration-15){video.currentTime=initialPosition;setNotice(`Resumed from ${formatTime(initialPosition)}.`)}};
+    const onMeta=()=>{milestones.current.clear();const key=episodeId+':'+source.id;if(playbackKey.current!==key){playbackKey.current=key;void trackPlayback('play_start',animeId,episodeId,source.id,userId)}if(initialPosition>0&&Number.isFinite(video.duration)&&initialPosition<video.duration-15){video.currentTime=initialPosition;setNotice(`Resumed from ${formatTime(initialPosition)}.`)}};
     const onTime=()=>{if(!video.duration)return;const p=video.currentTime/video.duration;for(const [t,n] of [[.25,25],[.5,50],[.75,75]] as const)if(p>=t&&!milestones.current.has(n)){milestones.current.add(n);void trackPlayback(`play_${n}`,animeId,episodeId,source.id,userId)}};const onError=()=>failover();video.addEventListener('loadedmetadata',onMeta);video.addEventListener('timeupdate',onTime);video.addEventListener('error',onError);
     if(source.source_type==='hls'){
       if(video.canPlayType('application/vnd.apple.mpegurl'))video.src=url;
