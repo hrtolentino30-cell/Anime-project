@@ -6,6 +6,7 @@ import type { Metadata } from 'next';
 import { getAnimeBySlug } from '@/lib/data';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { AnimeCard } from '@/components/AnimeCard';
+import { Analytics } from '@/components/Analytics';
 export const revalidate=60;
 
 export async function generateMetadata({params}:{params:Promise<{slug:string}>}):Promise<Metadata>{
@@ -28,7 +29,7 @@ export default async function AnimePage({params}:{params:Promise<{slug:string}>}
   const jsonLd={ '@context':'https://schema.org','@type':'TVSeries',name:anime.title,alternateName:altTitles.length?altTitles:undefined,description:anime.description||undefined,image:anime.poster_url?[anime.poster_url]:undefined,url:`https://animori.vercel.app/anime/${anime.slug}`,genre:genres.map((g:any)=>g.name),datePublished:anime.year?`${anime.year}`:undefined,numberOfEpisodes:episodes.length||anime.total_episodes||undefined };
 
 
-  return <div className="detailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}}/>
+  return <div className="detailPage"><Analytics eventName="anime_view" animeId={anime.id}/><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}}/>
     {art&&<div className="detailBackdrop"><Image src={art} alt="" fill priority sizes="100vw" className="heroImage"/><div className="detailGradient"/></div>}
     <div className="detailContent pageWidth">
       <div className="detailPoster">{anime.poster_url?<Image src={anime.poster_url} alt={anime.title} fill sizes="220px"/>:<div className="posterFallback">{anime.title[0]}</div>}</div>
