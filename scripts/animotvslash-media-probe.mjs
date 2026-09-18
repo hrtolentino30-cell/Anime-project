@@ -39,9 +39,10 @@ console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));
 const directMp4=candidates.find(u=>/\.mp4(?:\?|$)/i.test(u));
 if(directMp4) {
   console.log("DIRECT_MP4="+directMp4);
-  const cleanEnv=v=>(v||"").trim().replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9_:\/.?=&%-]+$/g,"");
-  const bridgeUrl=cleanEnv(process.env.FACEBOOK_RESOLVED_MEDIA_URL);
-  const bridgeSecret=cleanEnv(process.env.MEDIA_BRIDGE_SECRET);
+  const rawUrl=(process.env.FACEBOOK_RESOLVED_MEDIA_URL||"").trim();
+  const urlStart=rawUrl.indexOf("http");
+  const bridgeUrl=urlStart>=0?rawUrl.slice(urlStart).trim():"";
+  const bridgeSecret=(process.env.MEDIA_BRIDGE_SECRET||"").trim();
   if (bridgeUrl && bridgeSecret) {
     const payload={episode_url:pageUrl,caption:pageTitle,media_url:directMp4};
     const ir=await fetch(bridgeUrl,{method:"POST",headers:{"content-type":"application/json","x-media-bridge-secret":bridgeSecret},body:JSON.stringify(payload)});
