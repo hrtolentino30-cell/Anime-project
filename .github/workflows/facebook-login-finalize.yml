@@ -1,0 +1,28 @@
+name: Finalize Facebook login
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_id:
+        description: "STEEL_SESSION_ID from the Start Facebook login run"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: facebook-sync
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Release session and persist Facebook profile
+        env:
+          STEEL_API_KEY: ${{ secrets.STEEL_API_KEY }}
+          STEEL_SESSION_ID: ${{ inputs.session_id }}
+        run: node scripts/steel-facebook-finalize.mjs
