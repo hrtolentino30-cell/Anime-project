@@ -13,6 +13,18 @@ page.on("response", r => {
 await page.goto(pageUrl,{waitUntil:"domcontentloaded",timeout:60000});
 await page.waitForTimeout(4000);
 
+// Try visible player/server controls to trigger lazy media requests.
+const controls = page.locator("button, a");
+const count = Math.min(await controls.count(), 40);
+for (let i=0;i<count;i++) {
+  const el=controls.nth(i);
+  const text=((await el.innerText().catch(()=>\"\")).trim());
+  if (/ANIMO|Moon|Hydrax|VidHide|Vidara|play/i.test(text)) {
+    await el.click({timeout:2000}).catch(()=>{});
+    await page.waitForTimeout(1200);
+  }
+}
+
 const frames = await page.locator("iframe").evaluateAll(els => els.map(e => e.src).filter(Boolean));
 const videos = await page.locator("video").evaluateAll(els => els.flatMap(v => [v.currentSrc,v.src,...[...v.querySelectorAll("source")].map(s=>s.src)]).filter(Boolean));
 
