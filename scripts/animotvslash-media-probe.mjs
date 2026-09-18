@@ -39,14 +39,12 @@ console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));
 const directMp4=candidates.find(u=>/\.mp4(?:\?|$)/i.test(u));
 if(directMp4) {
   console.log("DIRECT_MP4="+directMp4);
-  const ingestUrl=process.env.FACEBOOK_INGEST_URL;
-  const ingestSecret=process.env.FACEBOOK_INGEST_SECRET;
-  const destinationSource=process.env.ANIMORI_SYNC_SOURCE_URL || "https://animotvslash.org/";
-  if (ingestUrl && ingestSecret) {
-    const postId = new URL(pageUrl).pathname.replace(/\/$/,"").split("/").filter(Boolean).pop() || Buffer.from(pageUrl).toString("base64url");
-    const payload={source_url:destinationSource,url:pageUrl,post_id:postId,caption:pageTitle,media_url:directMp4,content_fingerprint:postId};
-    const ir=await fetch(ingestUrl,{method:"POST",headers:{"content-type":"application/json","x-ingest-secret":ingestSecret},body:JSON.stringify(payload)});
-    console.log("FACEBOOK_INGEST_STATUS="+ir.status);
-    if(!ir.ok) console.log("FACEBOOK_INGEST_ERROR="+(await ir.text()).slice(0,500));
-  }
+  const bridgeUrl=process.env.FACEBOOK_RESOLVED_MEDIA_URL;
+  const bridgeSecret=process.env.SYNC_CRON_SECRET;
+  if (bridgeUrl && bridgeSecret) {
+    const payload={episode_url:pageUrl,caption:pageTitle,media_url:directMp4};
+    const ir=await fetch(bridgeUrl,{method:"POST",headers:{"content-type":"application/json","x-cron-secret":bridgeSecret},body:JSON.stringify(payload)});
+    console.log("FACEBOOK_BRIDGE_STATUS="+ir.status);
+    console.log("FACEBOOK_BRIDGE_RESPONSE="+(await ir.text()).slice(0,500));
+  } else console.log("FACEBOOK_BRIDGE_SKIPPED=missing bridge configuration");
 }
