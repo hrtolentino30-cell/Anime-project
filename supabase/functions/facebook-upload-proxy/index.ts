@@ -16,7 +16,11 @@ async function rpc(name: string, data: unknown) {
 async function graph(path: string, body?: BodyInit) {
   const r = await fetch(`https://${body ? "graph-video" : "graph"}.facebook.com/${GV}/${path}`, {method:body ? "POST" : "GET",body,signal:AbortSignal.timeout(90000)});
   const result = await r.json();
-  if (!r.ok || result.error) throw new Error(`Meta: ${result.error?.message || r.status}`);
+  if (!r.ok || result.error) {
+    const error = new Error(`Meta: ${result.error?.message || r.status}`) as Error & {terminal?: boolean};
+    error.terminal = [100,190,200].includes(Number(result.error?.code));
+    throw error;
+  }
   return result;
 }
 async function status(id: string) {
@@ -86,5 +90,5 @@ Deno.serve(async (req: Request) => {
       return Response.json({job:await transition("complete",{video_id:video.id,url:video.permalink_url ? new URL(video.permalink_url,"https://www.facebook.com").href : null})});
     }
     return Response.json({error:"Unknown phase"},{status:400});
-  } catch (error) { return Response.json({error:error instanceof Error ? error.message : String(error)},{status:502}); }
+  } catch (error) { return Response.json({error:error instanceof Error ? error.message : String(error),terminal:(error as {terminal?: boolean})?.terminal === true},{status:502}); }
 });

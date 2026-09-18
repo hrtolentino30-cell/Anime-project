@@ -18,7 +18,11 @@ async function api(phase, body, query = '') {
   if (body) headers['content-type'] = Buffer.isBuffer(body) ? 'application/octet-stream' : 'application/json';
   const r = await fetch(proxy + '?phase=' + phase + query, {method:body ? 'POST' : 'GET',headers,body:body ? (Buffer.isBuffer(body) ? body : JSON.stringify(body)) : undefined,signal:AbortSignal.timeout(110000)});
   const data = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(`${phase} failed (${r.status}): ${JSON.stringify(data)}`);
+  if (!r.ok) {
+    const error = new Error(`${phase} failed (${r.status}): ${JSON.stringify(data)}`);
+    error.terminal = data.terminal === true;
+    throw error;
+  }
   return data;
 }
 async function verify(videoId) {

@@ -110,3 +110,38 @@ create or replace function public.claim_facebook_episode_queue() returns table(e
 language plpgsql security invoker set search_path='' as $$ begin raise exception 'Legacy upload client retired; use claim_facebook_upload'; end $$;
 alter table public.facebook_episode_queue add column if not exists upload_bytes bigint not null default 0, add column if not exists file_bytes bigint, add column if not exists progress_at timestamptz;
 alter table public.facebook_episode_queue add column if not exists meta_status jsonb, add column if not exists checked_at timestamptz;
+create or replace function public.facebook_upload_transition(p_episode_id uuid,p_attempt integer,p_action text,p_data jsonb default '{}'::jsonb) returns jsonb
+language plpgsql security invoker set search_path='' as $$
+declare q public.facebook_episode_queue%rowtype; e public.episodes%rowtype; existing text;
+begin
+ select * into q from public.facebook_episode_queue where episode_id=p_episode_id for update;
+ if not found or q.status<>'processing' or q.attempts<>p_attempt then raise exception 'Upload lease is no longer current'; end if;
+ if p_action='reserve' then
+  if q.upload_started then raise exception 'Upload already started; reconcile existing video'; end if;
+  select * into e from public.episodes where id=p_episode_id for update;
+  if exists(select 1 from public.facebook_episode_publications p where p.anime_id=e.anime_id and p.episode_number=e.episode_number)
+   then raise exception 'Episode already published'; end if;
+  update public.facebook_episode_queue set upload_started=true where episode_id=p_episode_id;
+ elsif p_action='session' then
+  if not q.upload_started or q.destination_video_id is not null or coalesce(p_data->>'video_id','')!~'^[0-9]+$' then raise exception 'Invalid upload session'; end if;
+  update public.facebook_episode_queue set destination_video_id=p_data->>'video_id',upload_session_id=p_data->>'upload_session_id' where episode_id=p_episode_id;
+ elsif p_action='accepted' then
+  if q.destination_video_id is null then raise exception 'Missing video'; end if;
+  update public.facebook_episode_queue set finish_accepted=true where episode_id=p_episode_id;
+ elsif p_action='complete' then
+  if not q.finish_accepted or q.destination_video_id is distinct from p_data->>'video_id' then raise exception 'Video mismatch'; end if;
+  select * into e from public.episodes where id=p_episode_id for update;
+  select destination_video_id into existing from public.facebook_episode_publications where anime_id=e.anime_id and episode_number=e.episode_number;
+  if existing is not null and existing<>q.destination_video_id then raise exception 'Conflicting publication'; end if;
+  insert into public.facebook_episode_publications(anime_id,episode_number,destination_video_id,destination_url,source_name,published_at)
+  values(e.anime_id,e.episode_number,q.destination_video_id,p_data->>'url','animotvslash',now())
+  on conflict(anime_id,episode_number) do nothing;
+  update public.facebook_episode_queue set status='published',published_at=now(),last_error=null where episode_id=p_episode_id;
+ elsif p_action='fail' then
+  update public.facebook_episode_queue set
+  status=case when coalesce((p_data->>'terminal')::boolean,false) then 'failed' when q.finish_accepted and q.attempts<6 and coalesce((p_data->>'terminal')::boolean,false)=false then 'pending'
+              when not q.upload_started and q.attempts<3 then 'pending' else 'failed' end,
+  claimed_at=null,last_error=left(p_data->>'error',1000) where episode_id=p_episode_id;
+ else raise exception 'Unknown transition'; end if;
+ return (select to_jsonb(f.*) from public.facebook_episode_queue f where episode_id=p_episode_id);
+end $$;
