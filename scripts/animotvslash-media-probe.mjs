@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { chromium } from "playwright";\nimport { spawnSync } from "node:child_process";\nimport { statSync } from "node:fs";
 
 const pageUrl = process.env.ANIMOTV_EPISODE_URL || "https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/";
 const browser = await chromium.launch({headless:true});
@@ -33,20 +33,32 @@ for(const u of [...new Set([...frames,...videos,...hits])]) console.log("MEDIA_C
 const pageTitle=await page.title();
 await browser.close();
 
-// Emit machine-readable direct media URLs for downstream ingestion.
+// Prefer the HLS playback source. It carries the real adaptive-quality streams and audio.
 const candidates=[...new Set([...videos,...hits])].filter(u=>/\.m3u8(?:\?|$)|\.mp4(?:\?|$)/i.test(u));
 console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));
-const directMp4=candidates.find(u=>/\.mp4(?:\?|$)/i.test(u));
-if(directMp4) {
-  console.log("DIRECT_MP4="+directMp4);
-  const rawUrl=(process.env.FACEBOOK_RESOLVED_MEDIA_URL||"").trim();
-  const urlStart=rawUrl.indexOf("http");
-  const bridgeUrl=urlStart>=0?rawUrl.slice(urlStart).trim():"";
-  const bridgeSecret=(process.env.MEDIA_BRIDGE_SECRET||"").replace(/[^\\x20-\\x7E]/g,"").trim();
-  if (bridgeUrl && bridgeSecret) {
-    const payload={episode_url:pageUrl,caption:pageTitle,media_url:directMp4};
-    const ir=await fetch(bridgeUrl,{method:"POST",headers:{"content-type":"application/json","x-media-bridge-secret":bridgeSecret},body:JSON.stringify(payload)});
-    console.log("FACEBOOK_BRIDGE_STATUS="+ir.status);
-    console.log("FACEBOOK_BRIDGE_RESPONSE="+(await ir.text()).slice(0,500));
-  } else console.log("FACEBOOK_BRIDGE_SKIPPED=missing bridge configuration");
+const hls=candidates.find(u=>/\.m3u8(?:\?|$)/i.test(u));
+const previewMp4=candidates.find(u=>/\.mp4(?:\?|$)/i.test(u));
+if(hls) {
+  console.log("SOURCE_HLS="+hls);
+  const out="/tmp/facebook-upload.mp4";
+  const ff=spawnSync("ffmpeg",["-y","-i",hls,"-map","0:v:0","-map","0:a:0","-c","copy","-movflags","+faststart",out],{encoding:"utf8",timeout:240000});
+  if(ff.status!==0) {
+    console.error("FFMPEG_REMUX_FAILED="+(ff.stderr||"").slice(-1500));
+    process.exitCode=1;
+  } else {
+    const probe=spawnSync("ffprobe",["-v","error","-show_entries","stream=codec_type,width,height,codec_name","-of","json",out],{encoding:"utf8"});
+    console.log("MEDIA_PROBE="+probe.stdout.trim());
+    const info=JSON.parse(probe.stdout||"{\"streams\":[]}");
+    const video=info.streams?.find(s=>s.codec_type==="video");
+    const audio=info.streams?.find(s=>s.codec_type==="audio");
+    if(!video || !audio || (video.height||0)<480) {
+      console.error("MEDIA_VALIDATION_FAILED=requires audio and at least 480p");
+      process.exitCode=1;
+    } else {
+      console.log("FACEBOOK_MEDIA_READY="+out+" bytes="+statSync(out).size+" resolution="+video.width+"x"+video.height);
+    }
+  }
+} else {
+  console.error("NO_HLS_SOURCE_FOUND; refusing low-quality preview MP4="+(previewMp4||"none"));
+  process.exitCode=1;
 }
