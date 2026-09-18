@@ -25,12 +25,13 @@ export async function AdminDashboard(){
   const actionable=failed.filter((job:any)=>!isNaturallyArchived(job,replacements));
   const archivedCount=failed.length-actionable.length;
   const lastRun=runs?.[0];
-  const [{data:analytics},{data:searchAnalytics}]=await Promise.all([db.rpc('analytics_admin_summary',{p_days:30}),db.rpc('search_admin_summary',{p_days:30})]);
-  const a=(analytics??{}) as any,s=(searchAnalytics??{}) as any;
+  const [{data:analytics},{data:searchAnalytics},{data:overview}]=await Promise.all([db.rpc('analytics_admin_summary',{p_days:30}),db.rpc('search_admin_summary',{p_days:30}),db.rpc('analytics_admin_overview',{p_days:30})]);
+  const a=(analytics??{}) as any,s=(searchAnalytics??{}) as any,o=(overview??{}) as any;
 
   return <div className="adminPage">
     <div className="adminKicker"><strong>Operations</strong><span>Live catalog & ingestion health</span></div><div className="statsGrid"><Stat label="Anime" value={animeResult.count??0}/><Stat label="Episodes" value={episodeResult.count??0}/><Stat label="Open queue" value={openResult.count??0}/><Stat label="Needs attention" value={actionable.length}/><Stat label="Latest episode" value={latestEpisode?`${(latestEpisode.anime as any)?.title??'—'} · EP ${latestEpisode.episode_number}`:'—'}/><Stat label="Latest sync" value={lastRun?.finished_at?new Date(lastRun.finished_at).toLocaleString():'—'}/></div>
     <div className="adminKicker"><strong>Audience · 30 days</strong><span>First-party measured events; no modeled traffic</span></div><div className="statsGrid analyticsGrid"><Stat label="Sessions" value={a.sessions??0}/><Stat label="Known users" value={a.users??0}/><Stat label="Anime views" value={a.anime_views??0}/><Stat label="Play starts" value={a.play_starts??0}/><Stat label="Completion" value={`${a.completion_rate??0}%`}/><Stat label="Avg session" value={`${a.avg_session_minutes??0}m`}/></div>
+    <div className="adminKicker"><strong>Reach · 30 days</strong><span>Unique first-party sessions</span></div><div className="statsGrid analyticsGrid"><Stat label="DAU" value={o.dau??0}/><Stat label="WAU" value={o.wau??0}/><Stat label="MAU" value={o.mau??0}/><Stat label="Devices" value={(o.devices??[]).map((x:any)=>`${x.device}: ${x.events}`).join(" · ")||"—"}/><Stat label="Top referrer" value={o.referrers?.[0]?.referrer??"—"}/><Stat label="Top title" value={o.top_titles?.[0]?.title??"—"}/></div>
     <div className="adminKicker"><strong>Search · 30 days</strong><span>Submitted searches only</span></div><div className="statsGrid analyticsGrid"><Stat label="Searches" value={s.searches??0}/><Stat label="Zero results" value={s.zero_results??0}/><Stat label="Zero-result rate" value={String(s.zero_result_rate??0)+'%'}/></div>
     <AdminControls/>
 
