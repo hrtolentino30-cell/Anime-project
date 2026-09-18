@@ -1,0 +1,22 @@
+name: Start Facebook login
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  start:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: facebook-sync
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Create interactive Steel Facebook session
+        env:
+          STEEL_API_KEY: ${{ secrets.STEEL_API_KEY }}
+        run: node scripts/steel-facebook-login.mjs

@@ -6,3 +6,7 @@ node_modules
 coverage
 *.log
 .DS_Store
+.playwright
+auth-state.json
+facebook-media
+facebook-auth-state.b64
