@@ -14,6 +14,7 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
   const [result, setResult] = useState<SearchResult>({ query: '', rows: [], status: 'ready' });
   const [attempt, setAttempt] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const db = useRef(createSupabaseBrowserClient()).current;
   const tracked = useRef('');
   const term = query.trim();
   const searchable = term.length >= 2;
@@ -29,10 +30,10 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
     const timer = setTimeout(async () => {
       setResult({ query: term, rows: [], status: 'loading' });
       try {
-        const { data, error } = await createSupabaseBrowserClient()
+        const { data, error } = await db
           .rpc('search_anime', { p_query: term, p_limit: 24 })
           .abortSignal(controller.signal);
-        if (!cancelled) { const rows=(data ?? []); setResult({ query: term, rows: error ? [] : rows, status: error ? 'error' : 'ready' }); if(!error&&tracked.current!==term){tracked.current=term;void createSupabaseBrowserClient().from('search_events').insert({query:term,result_count:rows.length})} }
+        if (!cancelled) { const rows=(data ?? []); setResult({ query: term, rows: error ? [] : rows, status: error ? 'error' : 'ready' }); }
       } catch {
         if (!cancelled) setResult({ query: term, rows: [], status: 'error' });
       }
@@ -43,7 +44,7 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
   const status = !searchable ? 'Enter at least two characters to search.' : loading ? 'Searching…' : failed ? 'Search is unavailable. Please try again.' : `${rows.length}${rows.length === 24 ? '+' : ''} ${rows.length === 1 ? 'result' : 'results'} for “${term}”`;
 
   return <div className="searchExperience">
-    <form action="/search" className="bigSearch" role="search">
+    <form action="/search" className="bigSearch" role="search" onSubmit={()=>{if(searchable&&result.query===term&&result.status==='ready'&&tracked.current!==term){tracked.current=term;void db.from('search_events').insert({query:term.toLowerCase().replace(/\s+/g,' ').slice(0,80),result_count:rows.length})}}}>
       <Search size={22} aria-hidden="true" />
       <label htmlFor="catalog-search" className="srOnly">Search anime titles</label>
       <input ref={input} id="catalog-search" name="q" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search anime titles…" maxLength={160} autoFocus autoComplete="off" aria-describedby="search-status" />
