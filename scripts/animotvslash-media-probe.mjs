@@ -1,6 +1,6 @@
 import { chromium } from 'playwright';
 import { spawnSync } from 'node:child_process';
-import { statSync, openSync, readSync, closeSync, writeFileSync } from 'node:fs';
+import { statSync, openSync, readSync, closeSync } from 'node:fs';
 
 const proxy = (process.env.FACEBOOK_UPLOAD_PROXY_URL || '').trim();
 const oidcBase = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || '';
@@ -88,39 +88,18 @@ try {
     const out='/tmp/facebook-upload.mp4';
     let ready=false;
     for (const [hls,headers] of hits) {
-      // Fetch the manifest in the live browser session, then rewrite every media URI
-      // through the same authorized player origin. Direct FFmpeg requests to the CDN
-      // are rejected because they do not carry the browser's player/session context.
-      const frame = page.frames().find(f => {
-        try { return new URL(f.url()).origin === new URL(hls).origin; } catch { return false; }
-      }) || page;
-      let manifest;
-      try {
-        manifest = await frame.evaluate(async (url) => {
-          const r = await fetch(url, { credentials:'include' });
-          if (!r.ok) throw new Error('manifest HTTP ' + r.status);
-          return await r.text();
-        }, hls);
-      } catch (e) {
-        console.error('BROWSER_MANIFEST_FAILED=' + e.message);
-        continue;
-      }
-      const base = new URL(hls);
-      const rewritten = manifest.split(/\r?\n/).map(line => {
-        const t=line.trim();
-        if (!t || t.startsWith('#')) return line;
-        try { return new URL(t, base).href; } catch { return line; }
-      }).join('\n');
-      const manifestPath='/tmp/animori-input.m3u8';
-      writeFileSync(manifestPath,rewritten);
-      const cookieHeader=(await context.cookies()).map(x=>x.name+'='+x.value).join('; ');
-      const inputHeaders = [
-        headers['referer'] ? `Referer: ${headers['referer']}\r\n` : '',
-        headers['origin'] ? `Origin: ${headers['origin']}\r\n` : '',
-        headers['user-agent'] ? `User-Agent: ${headers['user-agent']}\r\n` : '',
-        cookieHeader ? `Cookie: ${cookieHeader}\r\n` : ''
-      ].join('');
-      const ff=spawnSync('ffmpeg',['-y','-nostdin','-rw_timeout','30000000','-protocol_whitelist','file,http,https,tcp,tls,crypto',...(inputHeaders ? ['-headers',inputHeaders] : []),'-i',manifestPath,'-c:v','copy','-c:a','aac','-b:a','192k','-movflags','+faststart',out],{encoding:'utf8',timeout:480000,maxBuffer:8*1024*1024});
+      // Replay the exact successful player request context. The CDN checks more than
+      // Referer/User-Agent; preserving the browser's complete safe request header set
+      // avoids stripping player-specific authorization signals.
+      const cookies=(await context.cookies(hls)).map(x=>x.name+'='+x.value).join('; ');
+      const blocked=new Set(['host','content-length','connection','accept-encoding','range']);
+      const replayHeaders=Object.entries(headers)
+        .filter(([k,v])=>v && !blocked.has(k.toLowerCase()) && !k.toLowerCase().startsWith('sec-ch-ua'))
+        .map(([k,v])=>`${k}: ${v}\r\n`);
+      if (cookies && !Object.keys(headers).some(k=>k.toLowerCase()==='cookie')) replayHeaders.push(`Cookie: ${cookies}\r\n`);
+      const inputHeaders=replayHeaders.join('');
+      console.log('MEDIA_REPLAY_HEADER_NAMES=' + JSON.stringify(replayHeaders.map(x=>x.split(':',1)[0])));
+      const ff=spawnSync('ffmpeg',['-y','-nostdin','-rw_timeout','30000000','-http_persistent','0',...(inputHeaders ? ['-headers',inputHeaders] : []),'-i',hls,'-c:v','copy','-c:a','aac','-b:a','192k','-movflags','+faststart',out],{encoding:'utf8',timeout:480000,maxBuffer:8*1024*1024});
       if (ff.status!==0) { console.error('MEDIA_REMUX_FAILED='+(ff.stderr || ff.error?.message || '').slice(-1600)); continue; }
       const probe=spawnSync('ffprobe',['-v','error','-show_streams','-show_format','-of','json',out],{encoding:'utf8',timeout:30000});
       if (probe.status!==0) continue;
