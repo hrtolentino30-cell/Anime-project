@@ -58,6 +58,30 @@ if(hls) {
       process.exitCode=1;
     } else {
       console.log("FACEBOOK_MEDIA_READY="+out+" bytes="+statSync(out).size+" resolution="+video.width+"x"+video.height);
+      const proxy=(process.env.FACEBOOK_UPLOAD_PROXY_URL||"").trim();
+      const oidcBase=process.env.ACTIONS_ID_TOKEN_REQUEST_URL||"", oidcReq=process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN||"";
+      if(proxy&&oidcBase&&oidcReq){
+        const tr=await fetch(oidcBase+(oidcBase.includes("?")?"&":"?")+"audience=animori-facebook-upload",{headers:{authorization:"Bearer "+oidcReq}});
+        if(!tr.ok) throw new Error("GitHub OIDC token request failed "+tr.status);
+        const jwt=(await tr.json()).value;
+        const size=statSync(out).size;
+        let r=await fetch(proxy+"?phase=start",{method:"POST",headers:{authorization:"Bearer "+jwt,"content-type":"application/json"},body:JSON.stringify({file_size:size})});
+        let state=await r.json(); if(!r.ok) throw new Error("Facebook upload start failed "+JSON.stringify(state));
+        const sid=String(state.upload_session_id), videoId=String(state.video_id||"");
+        const fd=openSync(out,"r");
+        try{
+          while(Number(state.start_offset)<Number(state.end_offset)){
+            const start=Number(state.start_offset), end=Number(state.end_offset), len=end-start;
+            const buf=Buffer.alloc(len); const got=readSync(fd,buf,0,len,start);
+            r=await fetch(proxy+"?phase=transfer&upload_session_id="+encodeURIComponent(sid)+"&start_offset="+start,{method:"POST",headers:{authorization:"Bearer "+jwt,"content-type":"application/octet-stream"},body:buf.subarray(0,got),duplex:"half"});
+            state=await r.json(); if(!r.ok) throw new Error("Facebook upload transfer failed "+JSON.stringify(state));
+            console.log("FACEBOOK_UPLOAD_PROGRESS="+state.start_offset+"/"+size);
+          }
+        } finally { closeSync(fd); }
+        r=await fetch(proxy+"?phase=finish",{method:"POST",headers:{authorization:"Bearer "+jwt,"content-type":"application/json"},body:JSON.stringify({upload_session_id:sid,title:pageTitle,description:pageTitle})});
+        const fin=await r.json(); if(!r.ok||fin.success===false) throw new Error("Facebook upload finish failed "+JSON.stringify(fin));
+        console.log("FACEBOOK_PUBLISHED_VIDEO_ID="+videoId);
+      } else console.log("FACEBOOK_DIRECT_UPLOAD_SKIPPED=OIDC proxy unavailable");
       const pageId=(process.env.META_PAGE_ID||"").trim();
       const pageToken=(process.env.META_PAGE_ACCESS_TOKEN||"").replace(/[^\\x20-\\x7E]/g,"").trim();
       const graphVersion=(process.env.META_GRAPH_VERSION||"v26.0").trim();
