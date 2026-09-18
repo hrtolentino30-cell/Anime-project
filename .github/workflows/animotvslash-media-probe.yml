@@ -1,25 +1,27 @@
 name: ANIMOTVSLASH media probe
 
 on:
-  push:
-    paths:
-      - 'scripts/animotvslash-media-probe.mjs'
-      - '.github/workflows/animotvslash-media-probe.yml'
   workflow_dispatch:
     inputs:
       episode_url:
-        description: "Public ANIMOTVSLASH episode URL"
+        description: "Optional episode URL; leave blank to process the next queued new episode"
         required: false
-        default: "https://animotvslash.org/the-exiled-heavy-knight-knows-how-to-game-the-system-episode-12/"
+        default: ""
+  schedule:
+    - cron: "*/10 * * * *"
 
 permissions:
   contents: read
   id-token: write
 
+concurrency:
+  group: animori-facebook-auto-upload
+  cancel-in-progress: false
+
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,7 +33,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - name: Resolve player candidates
         env:
-          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/the-exiled-heavy-knight-knows-how-to-game-the-system-episode-12/' }}
+          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
           FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
           MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
           FACEBOOK_UPLOAD_PROXY_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-upload-proxy
