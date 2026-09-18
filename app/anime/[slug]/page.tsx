@@ -29,7 +29,8 @@ export default async function AnimePage({params}:{params:Promise<{slug:string}>}
   const jsonLd={ '@context':'https://schema.org','@type':'TVSeries',name:anime.title,alternateName:altTitles.length?altTitles:undefined,description:anime.description||undefined,image:anime.poster_url?[anime.poster_url]:undefined,url:`https://www.animori.bond/anime/${anime.slug}`,genre:genres.map((g:any)=>g.name),datePublished:anime.year?`${anime.year}`:undefined,numberOfEpisodes:episodes.length||anime.total_episodes||undefined };
 
 
-  return <div className="detailPage"><Analytics eventName="anime_view" animeId={anime.id}/><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}}/>
+  const breadcrumbs={'@context':'https://schema.org','@type':'BreadcrumbList',itemListElement:[{'@type':'ListItem',position:1,name:'Home',item:'https://www.animori.bond/'},{'@type':'ListItem',position:2,name:'Browse',item:'https://www.animori.bond/browse'},{'@type':'ListItem',position:3,name:anime.title,item:`https://www.animori.bond/anime/${anime.slug}`}]};
+  return <div className="detailPage"><Analytics eventName="anime_view" animeId={anime.id}/><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}}/><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(breadcrumbs).replace(/</g,'\\u003c')}}/>
     {art&&<div className="detailBackdrop"><Image src={art} alt="" fill priority sizes="100vw" className="heroImage"/><div className="detailGradient"/></div>}
     <div className="detailContent pageWidth">
       <div className="detailPoster">{anime.poster_url?<Image src={anime.poster_url} alt={anime.title} fill sizes="220px"/>:<div className="posterFallback">{anime.title[0]}</div>}</div>
