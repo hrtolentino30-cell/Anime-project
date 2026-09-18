@@ -1,0 +1,30 @@
+name: Facebook standalone discovery
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/facebook-discovery.yml"
+      - "scripts/facebook-discovery.mjs"
+      - "supabase/functions/facebook-discovery/index.ts"
+      - "db/facebook-standalone-discovery.sql"
+  schedule:
+    - cron: "3,13,23,33,43,53 * * * *"
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: animori-facebook-discovery
+  cancel-in-progress: false
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Run standalone discovery
+        run: node scripts/facebook-discovery.mjs
