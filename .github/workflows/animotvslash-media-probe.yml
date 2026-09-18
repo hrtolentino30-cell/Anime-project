@@ -1,0 +1,29 @@
+name: ANIMOTVSLASH media probe
+
+on:
+  workflow_dispatch:
+    inputs:
+      episode_url:
+        description: "Public ANIMOTVSLASH episode URL"
+        required: false
+        default: "https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Resolve player candidates
+        env:
+          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
+        run: node scripts/animotvslash-media-probe.mjs
