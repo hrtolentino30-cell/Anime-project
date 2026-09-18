@@ -18,3 +18,4 @@ console.log("ANIMEPAHE_DISCOVERED="+items.length);
 const r=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json","x-media-bridge-secret":secret},body:JSON.stringify({items:items.slice(0,100)})});
 console.log("ANIMEPAHE_DETECT_STATUS="+r.status);console.log("ANIMEPAHE_DETECT_RESPONSE="+(await r.text()).slice(0,8000));if(!r.ok)process.exitCode=1;
 await browser.close();
+// Link Click S3E7 controlled validation
