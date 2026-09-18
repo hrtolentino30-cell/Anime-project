@@ -25,12 +25,13 @@ export async function AdminDashboard(){
   const actionable=failed.filter((job:any)=>!isNaturallyArchived(job,replacements));
   const archivedCount=failed.length-actionable.length;
   const lastRun=runs?.[0];
-  const {data:analytics}=await db.rpc('analytics_admin_summary',{p_days:30});
-  const a=(analytics??{}) as any;
+  const [{data:analytics},{data:searchAnalytics}]=await Promise.all([db.rpc('analytics_admin_summary',{p_days:30}),db.rpc('search_admin_summary',{p_days:30})]);
+  const a=(analytics??{}) as any,s=(searchAnalytics??{}) as any;
 
   return <div className="adminPage">
     <div className="adminKicker"><strong>Operations</strong><span>Live catalog & ingestion health</span></div><div className="statsGrid"><Stat label="Anime" value={animeResult.count??0}/><Stat label="Episodes" value={episodeResult.count??0}/><Stat label="Open queue" value={openResult.count??0}/><Stat label="Needs attention" value={actionable.length}/><Stat label="Latest episode" value={latestEpisode?`${(latestEpisode.anime as any)?.title??'—'} · EP ${latestEpisode.episode_number}`:'—'}/><Stat label="Latest sync" value={lastRun?.finished_at?new Date(lastRun.finished_at).toLocaleString():'—'}/></div>
     <div className="adminKicker"><strong>Audience · 30 days</strong><span>First-party measured events; no modeled traffic</span></div><div className="statsGrid analyticsGrid"><Stat label="Sessions" value={a.sessions??0}/><Stat label="Known users" value={a.users??0}/><Stat label="Anime views" value={a.anime_views??0}/><Stat label="Play starts" value={a.play_starts??0}/><Stat label="Completion" value={`${a.completion_rate??0}%`}/><Stat label="Avg session" value={`${a.avg_session_minutes??0}m`}/></div>
+    <div className="adminKicker"><strong>Search · 30 days</strong><span>Submitted searches only</span></div><div className="statsGrid analyticsGrid"><Stat label="Searches" value={s.searches??0}/><Stat label="Zero results" value={s.zero_results??0}/><Stat label="Zero-result rate" value={String(s.zero_result_rate??0)+'%'}/></div>
     <AdminControls/>
 
     <section className="adminSection"><div className="sectionHead"><h2>Queue</h2><span>{openResult.count??0} active · {archivedCount} stale/resolved failures hidden</span></div><div className="adminTable"><div className="adminRow head"><span>Status</span><span>Item</span><span>Type</span><span>Created</span><span>Action</span></div>{[...(activeQueue??[]),...actionable.slice(0,10)].map((job:any)=><div className="adminRow" key={job.id}><span className={`status ${job.status}`}>{job.status}</span><span>{job.source_id??'Queued item'}</span><span>{job.item_type}</span><span>{new Date(job.created_at).toLocaleString()}</span>{job.status==='failed'?<RetryButton id={job.id}/>:<span/>}{job.last_error&&<code>{safeError(job.last_error).slice(0,600)}</code>}</div>)}</div></section>
