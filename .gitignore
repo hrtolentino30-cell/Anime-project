@@ -9,3 +9,4 @@ coverage
 .playwright
 auth-state.json
 facebook-media
+facebook-auth-state.b64
