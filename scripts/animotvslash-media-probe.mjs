@@ -18,7 +18,7 @@ const controls = page.locator("button, a");
 const count = Math.min(await controls.count(), 40);
 for (let i=0;i<count;i++) {
   const el=controls.nth(i);
-  const text=((await el.innerText().catch(()=>\"\")).trim());
+  const text=((await el.innerText().catch(()=>"")).trim());
   if (/ANIMO|Moon|Hydrax|VidHide|Vidara|play/i.test(text)) {
     await el.click({timeout:2000}).catch(()=>{});
     await page.waitForTimeout(1200);
