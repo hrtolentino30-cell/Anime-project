@@ -1,10 +1,13 @@
-name: AnimePahe source probe
+name: AnimePahe Facebook detector
 on:
   workflow_dispatch:
   push:
-    paths: ['scripts/animepahe-probe.mjs','.github/workflows/animepahe-probe.yml']
+    paths:
+      - 'scripts/animepahe-probe.mjs'
+      - '.github/workflows/animepahe-probe.yml'
   schedule:
     - cron: '*/10 * * * *'
+
 permissions:
   contents: read
 
@@ -13,17 +16,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  probe:
+  detect:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "22" }
+        with:
+          node-version: '22'
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
-      - name: Detect AnimePahe episodes\n        env:\n          ANIMEPAHE_DETECT_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-animepahe-detect\n          MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}\n        run: node scripts/animepahe-probe.mjs
-
-# production detector
-
-# controlled latest-release publish test 2026-09-18
+      - name: Detect AnimePahe episodes
+        env:
+          ANIMEPAHE_DETECT_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-animepahe-detect
+          MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
+        run: node scripts/animepahe-probe.mjs
