@@ -1,6 +1,10 @@
 name: Facebook source monitor
 
 on:
+  push:
+    paths:
+      - '.github/workflows/facebook-sync.yml'
+      - 'scripts/facebook-sync.mjs'
   workflow_dispatch:
   schedule:
     - cron: "7,22,37,52 * * * *"
