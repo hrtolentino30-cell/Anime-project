@@ -5,6 +5,13 @@ on:
     paths: ['scripts/animepahe-probe.mjs','.github/workflows/animepahe-probe.yml']
   schedule:
     - cron: '*/10 * * * *'
+permissions:
+  contents: read
+
+concurrency:
+  group: animori-animepahe-facebook-detect
+  cancel-in-progress: false
+
 jobs:
   probe:
     runs-on: ubuntu-latest
