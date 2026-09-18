@@ -80,7 +80,18 @@ if(hls) {
         } finally { closeSync(fd); }
         r=await fetch(proxy+"?phase=finish",{method:"POST",headers:{authorization:"Bearer "+jwt,"content-type":"application/json"},body:JSON.stringify({upload_session_id:sid,title:pageTitle,description:pageTitle})});
         const fin=await r.json(); if(!r.ok||fin.success===false) throw new Error("Facebook upload finish failed "+JSON.stringify(fin));
-        console.log("FACEBOOK_PUBLISHED_VIDEO_ID="+videoId);
+        console.log("FACEBOOK_UPLOAD_ACCEPTED_VIDEO_ID="+videoId);
+        let verified=false;
+        for(let attempt=1;attempt<=12;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10000));
+          const sr=await fetch(proxy+"?phase=status&video_id="+encodeURIComponent(videoId),{headers:{authorization:"Bearer "+jwt}});
+          const sj=await sr.json().catch(()=>({}));
+          console.log("FACEBOOK_STATUS_CHECK_"+attempt+"="+JSON.stringify(sj));
+          const processing=sj?.status?.video_status||sj?.status?.processing_phase?.status||"";
+          if(sr.ok && sj.published===true && !/processing|uploading|error|failed/i.test(String(processing))){verified=true;console.log("FACEBOOK_PUBLISHED_VIDEO_ID="+videoId);if(sj.permalink_url)console.log("FACEBOOK_PERMALINK="+sj.permalink_url);break;}
+          if(/error|failed/i.test(String(processing)))throw new Error("Facebook post-upload processing failed "+JSON.stringify(sj));
+        }
+        if(!verified)throw new Error("Facebook upload accepted but public/published verification timed out");
       } else console.log("FACEBOOK_DIRECT_UPLOAD_SKIPPED=OIDC proxy unavailable");
       const pageId=(process.env.META_PAGE_ID||"").trim();
       const pageToken=(process.env.META_PAGE_ACCESS_TOKEN||"").replace(/[^\\x20-\\x7E]/g,"").trim();
