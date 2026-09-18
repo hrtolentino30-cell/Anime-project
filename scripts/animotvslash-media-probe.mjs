@@ -42,7 +42,8 @@ if(directMp4) {
   const rawUrl=(process.env.FACEBOOK_RESOLVED_MEDIA_URL||"").trim();
   const urlStart=rawUrl.indexOf("http");
   const bridgeUrl=urlStart>=0?rawUrl.slice(urlStart).trim():"";
-  const bridgeSecret=(process.env.MEDIA_BRIDGE_SECRET||"").trim();
+  const stripQuotes=v=>(v||"").trim().replace(/^["“”‘’]+|["“”‘’]+$/g,"");
+  const bridgeSecret=stripQuotes(process.env.MEDIA_BRIDGE_SECRET);
   if (bridgeUrl && bridgeSecret) {
     const payload={episode_url:pageUrl,caption:pageTitle,media_url:directMp4};
     const ir=await fetch(bridgeUrl,{method:"POST",headers:{"content-type":"application/json","x-media-bridge-secret":bridgeSecret},body:JSON.stringify(payload)});
