@@ -30,5 +30,5 @@ jobs:
         env:
           ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/' }}
           FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
-          SYNC_CRON_SECRET: ${{ secrets.SYNC_CRON_SECRET }}
+          MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
         run: node scripts/animotvslash-media-probe.mjs
