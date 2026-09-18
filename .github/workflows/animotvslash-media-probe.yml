@@ -15,6 +15,10 @@ on:
 permissions:
   contents: read
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -33,7 +37,5 @@ jobs:
           ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/the-exiled-heavy-knight-knows-how-to-game-the-system-episode-12/' }}
           FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
           MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
-          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
-          META_PAGE_ACCESS_TOKEN: ${{ secrets.META_PAGE_ACCESS_TOKEN }}
-          META_GRAPH_VERSION: v26.0
+          FACEBOOK_UPLOAD_PROXY_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-upload-proxy
         run: node scripts/animotvslash-media-probe.mjs
