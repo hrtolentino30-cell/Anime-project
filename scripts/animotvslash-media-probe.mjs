@@ -39,7 +39,8 @@ console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));
 const directMp4=candidates.find(u=>/\.mp4(?:\?|$)/i.test(u));
 if(directMp4) {
   console.log("DIRECT_MP4="+directMp4);
-  const cleanEnv=v=>(v||"").trim().replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9_:\/.?=&%-]+$/g,"");\n  const bridgeUrl=cleanEnv(process.env.FACEBOOK_RESOLVED_MEDIA_URL);
+  const cleanEnv=v=>(v||"").trim().replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9_:\/.?=&%-]+$/g,"");
+  const bridgeUrl=cleanEnv(process.env.FACEBOOK_RESOLVED_MEDIA_URL);
   const bridgeSecret=cleanEnv(process.env.MEDIA_BRIDGE_SECRET);
   if (bridgeUrl && bridgeSecret) {
     const payload={episode_url:pageUrl,caption:pageTitle,media_url:directMp4};
