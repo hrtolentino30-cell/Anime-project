@@ -8,7 +8,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "node --test tests/*.test.mjs",
-    "acceptance": "node scripts/acceptance.mjs"
+    "acceptance": "node scripts/acceptance.mjs",
+    "facebook:sync": "node scripts/facebook-sync.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -17,6 +18,7 @@
     "hls.js": "^1.7.3",
     "lucide-react": "^1.46.0",
     "next": "^16.3.3",
+    "playwright": "^1.55.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
