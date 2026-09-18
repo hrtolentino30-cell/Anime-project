@@ -29,7 +29,6 @@ jobs:
       - name: Resolve player candidates
         env:
           ANIMOTV_EPISODE_URL: ${{ inputs.episode_url || 'https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/' }}
-          FACEBOOK_INGEST_URL: ${{ secrets.FACEBOOK_INGEST_URL }}
-          FACEBOOK_INGEST_SECRET: ${{ secrets.FACEBOOK_INGEST_SECRET }}
-          ANIMORI_SYNC_SOURCE_URL: ${{ secrets.ANIMORI_SYNC_SOURCE_URL }}
+          FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
+          SYNC_CRON_SECRET: ${{ secrets.SYNC_CRON_SECRET }}
         run: node scripts/animotvslash-media-probe.mjs
