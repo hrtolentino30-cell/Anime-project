@@ -83,7 +83,7 @@ Deno.serve(async (req: Request) => {
     if (phase === "complete") {
       const video = await status(job.destination_video_id || "");
       if (video.published !== true || video.status?.video_status !== "ready") return Response.json({error:"Video is not published and ready",video},{status:409});
-      return Response.json({job:await transition("complete",{video_id:video.id,url:video.permalink_url})});
+      return Response.json({job:await transition("complete",{video_id:video.id,url:video.permalink_url ? new URL(video.permalink_url,"https://www.facebook.com").href : null})});
     }
     return Response.json({error:"Unknown phase"},{status:400});
   } catch (error) { return Response.json({error:error instanceof Error ? error.message : String(error)},{status:502}); }
