@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Animori Source Bridge",
+  "version": "1.0.0",
+  "description": "Sends authorized AnimePahe episode metadata from your normal browser to Animori.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://animepahe.com/*",
+    "https://animepahe.pw/*",
+    "https://*.supabase.co/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://animepahe.com/play/*",
+        "https://animepahe.pw/play/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Animori Source Bridge"
+  }
+}
