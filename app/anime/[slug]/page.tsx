@@ -26,7 +26,7 @@ export default async function AnimePage({params}:{params:Promise<{slug:string}>}
   const genres=(anime.anime_genres??[]).map((x:any)=>x.genres).filter(Boolean);
   const studios=(anime.anime_studios??[]).map((x:any)=>x.studios).filter(Boolean);
   const cast=(anime.anime_characters??[]).filter((x:any)=>x.characters).slice(0,12);
-  const jsonLd={ '@context':'https://schema.org','@type':'TVSeries',name:anime.title,alternateName:altTitles.length?altTitles:undefined,description:anime.description||undefined,image:anime.poster_url?[anime.poster_url]:undefined,url:`https://animori.bond/anime/${anime.slug}`,genre:genres.map((g:any)=>g.name),datePublished:anime.year?`${anime.year}`:undefined,numberOfEpisodes:episodes.length||anime.total_episodes||undefined };
+  const jsonLd={ '@context':'https://schema.org','@type':'TVSeries',name:anime.title,alternateName:altTitles.length?altTitles:undefined,description:anime.description||undefined,image:anime.poster_url?[anime.poster_url]:undefined,url:`https://www.animori.bond/anime/${anime.slug}`,genre:genres.map((g:any)=>g.name),datePublished:anime.year?`${anime.year}`:undefined,numberOfEpisodes:episodes.length||anime.total_episodes||undefined };
 
 
   return <div className="detailPage"><Analytics eventName="anime_view" animeId={anime.id}/><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}}/>
