@@ -7,8 +7,6 @@ on:
         description: "Optional episode URL; leave blank to process the next queued new episode"
         required: false
         default: ""
-  schedule:
-    - cron: "*/10 * * * *"
 
 permissions:
   contents: read
