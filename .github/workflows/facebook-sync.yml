@@ -18,12 +18,9 @@ jobs:
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: facebook-sync
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
       - run: npm install --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
       - name: Check authorized Facebook sources
