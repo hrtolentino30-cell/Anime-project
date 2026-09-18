@@ -8,6 +8,18 @@ const items=[];
 const seen=new Set();
 const add=(title,url,episode=null)=>{if(!title||!url)return;try{url=new URL(url,base).href}catch{return}if(!url.startsWith(base)||seen.has(url))return;seen.add(url);items.push({title:String(title).replace(/\s+/g," ").trim(),url,episode})};
 for(const x of await page.locator("a").evaluateAll(as=>as.map(a=>({title:(a.textContent||"").trim(),url:a.href}))))add(x.title,x.url);
+// Prefer the upstream airing feed: it exposes anime id + episode session directly.
+try {
+  const ar=await page.request.get(base+"api?m=airing&page=1",{headers:{referer:base}});
+  if(ar.ok()){
+    const aj=await ar.json().catch(()=>null);
+    for(const e of aj?.data||[]){
+      const ep=Number(e.episode), id=e.anime_id||e.id, es=e.session;
+      if(!ep||!id||!es)continue;
+      add((e.anime_title||e.title||"Anime")+" Episode "+ep,base+"play/"+id+"/"+es,ep);
+    }
+  }
+} catch {}
 const sessions=[...new Set(items.map(x=>x.url.match(/\/anime\/([^/?#]+)/)?.[1]).filter(Boolean))].slice(0,30);
 for(const session of sessions){
  const api=base+"api?m=release&id="+encodeURIComponent(session)+"&sort=episode_desc&page=1";
