@@ -1,0 +1,16 @@
+name: AnimePahe source probe
+on:
+  workflow_dispatch:
+  push:
+    paths: ['scripts/animepahe-probe.mjs','.github/workflows/animepahe-probe.yml']
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/animepahe-probe.mjs
