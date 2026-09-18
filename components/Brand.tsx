@@ -1,4 +1,5 @@
-/** Text lockup until the separate brand-asset workstream supplies its final exports. */
+import Image from 'next/image';
+
 export function Brand() {
-  return <span className="brand"><span className="brandMark" aria-hidden="true">A</span><span className="brandName">Animori</span></span>;
+  return <span className="brand"><Image className="brandLockup" src="/animori-lockup-horizontal.svg" alt="Animori" width={170} height={56} priority /></span>;
 }
