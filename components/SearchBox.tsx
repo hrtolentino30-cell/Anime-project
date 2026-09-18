@@ -13,6 +13,8 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
   const [query, setQuery] = useState(initial);
   const [result, setResult] = useState<SearchResult>({ query: '', rows: [], status: 'ready' });
   const [attempt, setAttempt] = useState(0);
+  const [recent,setRecent]=useState<string[]>([]);
+  useEffect(()=>{try{setRecent(JSON.parse(localStorage.getItem('animori_recent_searches')||'[]').slice(0,5))}catch{}},[]);
   const input = useRef<HTMLInputElement>(null);
   const db = useRef(createSupabaseBrowserClient()).current;
   const tracked = useRef('');
@@ -44,7 +46,7 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
   const status = !searchable ? 'Enter at least two characters to search.' : loading ? 'Searching…' : failed ? 'Search is unavailable. Please try again.' : `${rows.length}${rows.length === 24 ? '+' : ''} ${rows.length === 1 ? 'result' : 'results'} for “${term}”`;
 
   return <div className="searchExperience">
-    <form action="/search" className="bigSearch" role="search" onSubmit={()=>{if(searchable&&result.query===term&&result.status==='ready'&&tracked.current!==term){tracked.current=term;void db.from('search_events').insert({query:term.toLowerCase().replace(/\s+/g,' ').slice(0,80),result_count:rows.length})}}}>
+    <form action="/search" className="bigSearch" role="search" onSubmit={()=>{if(searchable&&result.query===term&&result.status==='ready'&&tracked.current!==term){tracked.current=term;const next=[term,...recent.filter(x=>x!==term)].slice(0,5);setRecent(next);try{localStorage.setItem('animori_recent_searches',JSON.stringify(next))}catch{}void db.from('search_events').insert({query:term.toLowerCase().replace(/\s+/g,' ').slice(0,80),result_count:rows.length})}}}>
       <Search size={22} aria-hidden="true" />
       <label htmlFor="catalog-search" className="srOnly">Search anime titles</label>
       <input ref={input} id="catalog-search" name="q" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search anime titles…" maxLength={160} autoFocus autoComplete="off" aria-describedby="search-status" />
@@ -55,7 +57,7 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
       {loading && <div className="searchSkeleton" aria-hidden="true">{[0, 1, 2].map(item => <div key={item}><i /><span /></div>)}</div>}
       {failed && <div className="emptyState"><h2>Let’s try that again</h2><p>We couldn’t load your results.</p><button className="primaryBtn" onClick={() => setAttempt(value => value + 1)}>Retry search</button></div>}
       {searchable && !loading && !failed && rows.length === 0 && <div className="emptyState"><Search size={28} aria-hidden="true" /><h2>No titles found</h2><p>Try a different spelling, a shorter title, or the Japanese name.</p><Link href="/browse" className="ghostBtn">Browse all anime</Link></div>}
-      {!searchable && <div className="searchPrompt"><p>Search by English, Japanese, or alternate title.</p><Link href="/browse">Explore the catalog <ArrowUpRight size={16} aria-hidden="true" /></Link></div>}
+      {!searchable && <div className="searchPrompt"><p>Search by English, Japanese, or alternate title.</p>{recent.length>0&&<div className="chips" aria-label="Recent searches">{recent.map(x=><button type="button" key={x} onClick={()=>setQuery(x)}>{x}</button>)}</div>}<Link href="/browse">Explore the catalog <ArrowUpRight size={16} aria-hidden="true" /></Link></div>}
       {rows.length > 0 && <div className="searchResults">{rows.map(row => <Link href={`/anime/${row.slug}`} key={row.id}>
         {row.poster_url ? <Image src={row.poster_url} alt="" width={64} height={90} /> : <span className="searchPosterFallback" aria-hidden="true">{row.title.slice(0, 1)}</span>}
         <div><strong>{row.title}</strong><span>{[row.title_japanese, row.type, row.year].filter(Boolean).join(' · ')}</span></div>
