@@ -84,6 +84,17 @@ try {
       await page.waitForTimeout(1500);
     }
     console.log('PLAYER_FRAMES=' + JSON.stringify(page.frames().map(f=>f.url())));
+    // ANIMOTVSLASH embeds the authorized Rumble playlist directly in its jw-player payload.
+    // Browser autoplay can be blocked, so recover that declared playlist without depending on playback starting.
+    for (const f of page.frames()) {
+      const m=f.url().match(/\/jw-player\/([^/?#]+)/i);
+      if (!m) continue;
+      try {
+        const raw=Buffer.from(decodeURIComponent(m[1]),'base64url').toString('utf8');
+        const cfg=JSON.parse(raw);
+        if (/^https:\/\/rumble\.com\/hls-vod\/.*\.m3u8(?:\?|$)/i.test(cfg.url || '')) hits.set(cfg.url,{});
+      } catch {}
+    }
     if (!hits.size) throw new Error('No full HLS source found after activating embedded players');
     const candidateRank = u => /rumble\.com\/hls-vod\//i.test(u) ? 0 : /mega\/fetch\.nexabloom\.top/i.test(u) ? 2 : 1;
     console.log('MEDIA_CANDIDATES=' + JSON.stringify([...hits.keys()].map(u=>({host:new URL(u).host,rank:candidateRank(u)}))));
