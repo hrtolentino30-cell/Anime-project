@@ -6,6 +6,7 @@ import './final-polish.css';
 import { Header } from '@/components/Header';
 import { Brand } from '@/components/Brand';
 import Link from 'next/link';
+import Script from 'next/script';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://animori.vercel.app'),
@@ -21,5 +22,5 @@ export const metadata: Metadata = {
 export const viewport: Viewport = { width: 'device-width', initialScale: 1, viewportFit: 'cover', themeColor: '#0c0d0f' };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><a href="#main-content" className="skipLink">Skip to content</a><Header/><main id="main-content" tabIndex={-1}>{children}</main><footer className="footer"><Link href="/" aria-label="Animori home"><Brand/></Link><nav aria-label="Footer navigation"><Link href="/browse">Browse anime</Link><Link href="/schedule">Release schedule</Link><Link href="/my-list">My List</Link></nav></footer></body></html>;
+  return <html lang="en"><body><a href="#main-content" className="skipLink">Skip to content</a><Header/><main id="main-content" tabIndex={-1}>{children}</main><footer className="footer"><Link href="/" aria-label="Animori home"><Brand/></Link><nav aria-label="Footer navigation"><Link href="/browse">Browse anime</Link><Link href="/schedule">Release schedule</Link><Link href="/my-list">My List</Link></nav></footer><Script id="cloudflare-web-analytics" type="module" src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"622ad87d5197446aaa22d280f004c6c2"}' strategy="afterInteractive"/></body></html>;
 }
