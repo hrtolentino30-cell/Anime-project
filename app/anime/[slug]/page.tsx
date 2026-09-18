@@ -2,10 +2,17 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Play } from 'lucide-react';
+import type { Metadata } from 'next';
 import { getAnimeBySlug } from '@/lib/data';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { AnimeCard } from '@/components/AnimeCard';
 export const revalidate=60;
+
+export async function generateMetadata({params}:{params:Promise<{slug:string}>}):Promise<Metadata>{
+ const {slug}=await params,data=await getAnimeBySlug(slug);if(!data)return{title:'Anime not found',robots:{index:false,follow:false}};
+ const a=data.anime,description=(a.description||`Explore ${a.title}, episodes, cast and series information on Animori.`).replace(/\\s+/g,' ').trim().slice(0,160),canonical=`/anime/${a.slug}`,images=a.poster_url?[{url:a.poster_url,alt:`${a.title} anime poster`}]:undefined;
+ return{title:a.title,description,alternates:{canonical},openGraph:{type:'website',url:canonical,title:a.title,description,images},twitter:{card:'summary_large_image',title:a.title,description,images:a.poster_url?[a.poster_url]:undefined}};
+}
 
 export default async function AnimePage({params}:{params:Promise<{slug:string}>}){
   const {slug}=await params;
@@ -18,8 +25,10 @@ export default async function AnimePage({params}:{params:Promise<{slug:string}>}
   const genres=(anime.anime_genres??[]).map((x:any)=>x.genres).filter(Boolean);
   const studios=(anime.anime_studios??[]).map((x:any)=>x.studios).filter(Boolean);
   const cast=(anime.anime_characters??[]).filter((x:any)=>x.characters).slice(0,12);
+  const jsonLd={ '@context':'https://schema.org','@type':'TVSeries',name:anime.title,alternateName:altTitles.length?altTitles:undefined,description:anime.description||undefined,image:anime.poster_url?[anime.poster_url]:undefined,url:`https://animori.vercel.app/anime/${anime.slug}`,genre:genres.map((g:any)=>g.name),datePublished:anime.year?`${anime.year}`:undefined,numberOfEpisodes:episodes.length||anime.total_episodes||undefined };
 
-  return <div className="detailPage">
+
+  return <div className="detailPage"><script type="application/ld+json" dangerouslySetInnerHTML={{__html:JSON.stringify(jsonLd).replace(/</g,'\\u003c')}}/>
     {art&&<div className="detailBackdrop"><Image src={art} alt="" fill priority sizes="100vw" className="heroImage"/><div className="detailGradient"/></div>}
     <div className="detailContent pageWidth">
       <div className="detailPoster">{anime.poster_url?<Image src={anime.poster_url} alt={anime.title} fill sizes="220px"/>:<div className="posterFallback">{anime.title[0]}</div>}</div>
