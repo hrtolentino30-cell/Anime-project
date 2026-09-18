@@ -1,6 +1,10 @@
 name: ANIMOTVSLASH media probe
 
 on:
+  push:
+    paths:
+      - 'scripts/animotvslash-media-probe.mjs'
+      - '.github/workflows/animotvslash-media-probe.yml'
   workflow_dispatch:
     inputs:
       episode_url:
