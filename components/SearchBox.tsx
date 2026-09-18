@@ -14,6 +14,7 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
   const [result, setResult] = useState<SearchResult>({ query: '', rows: [], status: 'ready' });
   const [attempt, setAttempt] = useState(0);
   const input = useRef<HTMLInputElement>(null);
+  const tracked = useRef('');
   const term = query.trim();
   const searchable = term.length >= 2;
   const current = result.query === term;
@@ -31,7 +32,7 @@ export function SearchBox({ initial = '' }: { initial?: string }) {
         const { data, error } = await createSupabaseBrowserClient()
           .rpc('search_anime', { p_query: term, p_limit: 24 })
           .abortSignal(controller.signal);
-        if (!cancelled) setResult({ query: term, rows: error ? [] : (data ?? []), status: error ? 'error' : 'ready' });
+        if (!cancelled) { const rows=(data ?? []); setResult({ query: term, rows: error ? [] : rows, status: error ? 'error' : 'ready' }); if(!error&&tracked.current!==term){tracked.current=term;void createSupabaseBrowserClient().from('search_events').insert({query:term,result_count:rows.length})} }
       } catch {
         if (!cancelled) setResult({ query: term, rows: [], status: 'error' });
       }
