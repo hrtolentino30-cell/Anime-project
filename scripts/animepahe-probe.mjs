@@ -1,9 +1,9 @@
 import { chromium } from "playwright";
 const endpoint=(process.env.ANIMEPAHE_DETECT_URL||"").trim(),secret=(process.env.MEDIA_BRIDGE_SECRET||"").replace(/[^\x20-\x7E]/g,"").trim();
 if(!endpoint||!secret)throw new Error("Detector configuration missing");
-const bases=["https://animepahe.ru/","https://animepahe.com/","https://animepahe.org/","https://animepahe.pw/"];\nconst browser=await chromium.launch({headless:true});
+const bases=["https://animepahe.com/","https://animepahe.pw/"];\nconst browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:1280,height:900}});
-let base=""; for(const b of bases){try{const rr=await page.goto(b,{waitUntil:"domcontentloaded",timeout:60000});await page.waitForTimeout(8000);if(rr&&rr.status()<400){base=b;break}}catch{}} if(!base)throw new Error("No AnimePahe domain accepted this browser session");
+let base=""; for(const b of bases){try{const rr=await page.goto(b,{waitUntil:"domcontentloaded",timeout:60000});await page.waitForTimeout(8000);console.log("ANIMEPAHE_DOMAIN="+b+" STATUS="+(rr?.status()||0));if(rr&&rr.status()<400){base=b;break}}catch(e){console.log("ANIMEPAHE_DOMAIN_ERROR="+b+" "+e.message)}} if(!base)throw new Error("No AnimePahe domain accepted this browser session");
 const items=[];
 const seen=new Set();
 const add=(title,url,episode=null)=>{if(!title||!url)return;try{url=new URL(url,base).href}catch{return}if(!url.startsWith(base)||seen.has(url))return;seen.add(url);items.push({title:String(title).replace(/\s+/g," ").trim(),url,episode})};
