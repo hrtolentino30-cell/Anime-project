@@ -5,3 +5,4 @@ await page.goto("https://animepahe.pw/anime",{waitUntil:"domcontentloaded",timeo
 console.log("ANIMEPAHE_TITLE="+await page.title());
 console.log("ANIMEPAHE_LINKS_JSON="+JSON.stringify(await page.locator("a").evaluateAll(as=>as.map(a=>({text:(a.textContent||"").trim(),href:a.href})).filter(x=>x.href.includes("animepahe")).slice(0,100))));
 console.log("ANIMEPAHE_RESPONSES_JSON="+JSON.stringify(hits.slice(-100)));await browser.close();
+// probe trigger
