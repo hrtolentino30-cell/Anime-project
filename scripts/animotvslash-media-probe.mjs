@@ -34,7 +34,9 @@ await browser.close();
 
 // Emit machine-readable direct media URLs for downstream ingestion.
 const candidates=[...new Set([...videos,...hits])].filter(u=>/\.m3u8(?:\?|$)|\.mp4(?:\?|$)/i.test(u));
-console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));\nconst directMp4=candidates.find(u=>/\\.mp4(?:\\?|$)/i.test(u));\nif(directMp4) {
+console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));
+const directMp4=candidates.find(u=>/\\.mp4(?:\\?|$)/i.test(u));
+if(directMp4) {
   console.log("DIRECT_MP4="+directMp4);
   const ingestUrl=process.env.FACEBOOK_INGEST_URL;
   const ingestSecret=process.env.FACEBOOK_INGEST_SECRET;
