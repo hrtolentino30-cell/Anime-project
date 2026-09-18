@@ -1,4 +1,6 @@
-import { chromium } from "playwright";\nimport { spawnSync } from "node:child_process";\nimport { statSync } from "node:fs";
+import { chromium } from "playwright";
+import { spawnSync } from "node:child_process";
+import { statSync } from "node:fs";
 
 const pageUrl = process.env.ANIMOTV_EPISODE_URL || "https://animotvslash.org/the-beginning-after-the-end-season-2-episode-10/";
 const browser = await chromium.launch({headless:true});
