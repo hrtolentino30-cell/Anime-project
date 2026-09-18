@@ -31,3 +31,7 @@ const videos = await page.locator("video").evaluateAll(els => els.flatMap(v => [
 console.log("EPISODE_URL="+pageUrl);
 for(const u of [...new Set([...frames,...videos,...hits])]) console.log("MEDIA_CANDIDATE="+u);
 await browser.close();
+
+// Emit machine-readable direct media URLs for downstream ingestion.
+const candidates=[...new Set([...videos,...hits])].filter(u=>/\.m3u8(?:\?|$)|\.mp4(?:\?|$)/i.test(u));
+console.log("DIRECT_MEDIA_JSON="+JSON.stringify(candidates));
