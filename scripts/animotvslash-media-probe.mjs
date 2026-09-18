@@ -94,23 +94,7 @@ if(hls) {
         }
         if(!verified)throw new Error("Facebook upload accepted but public/published verification timed out");
       } else console.log("FACEBOOK_DIRECT_UPLOAD_SKIPPED=OIDC proxy unavailable");
-      const pageId=(process.env.META_PAGE_ID||"").trim();
-      const pageToken=(process.env.META_PAGE_ACCESS_TOKEN||"").replace(/[^\\x20-\\x7E]/g,"").trim();
-      const graphVersion=(process.env.META_GRAPH_VERSION||"v26.0").trim();
-      if(pageId && pageToken) {
-        const { default: FormData } = await import("form-data");
-        const form=new FormData();
-        form.append("access_token",pageToken);
-        form.append("description",pageTitle);
-        form.append("source",createReadStream(out),{filename:"animori-episode.mp4",contentType:"video/mp4",knownLength:statSync(out).size});
-        const upload=await fetch(`https://graph-video.facebook.com/${graphVersion}/${pageId}/videos`,{method:"POST",headers:form.getHeaders(),body:form,duplex:"half"});
-        const responseText=await upload.text();
-        console.log("FACEBOOK_DIRECT_UPLOAD_STATUS="+upload.status);
-        console.log("FACEBOOK_DIRECT_UPLOAD_RESPONSE="+responseText.slice(0,500));
-        if(!upload.ok) process.exitCode=1;
-      } else {
-        console.log("FACEBOOK_DIRECT_UPLOAD_SKIPPED=missing Meta runner secrets");
-      }
+
     }
   }
 } else {
