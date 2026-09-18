@@ -102,3 +102,9 @@ begin
  where episode_id=q.episode_id returning to_jsonb(facebook_episode_queue.*) into result;
  return result;
 end $$;
+
+drop trigger if exists trg_queue_new_episode_for_facebook on public.episodes;
+create trigger trg_queue_new_episode_for_facebook after insert or update of air_date,source_url on public.episodes for each row execute function public.queue_new_episode_for_facebook();
+alter function public.touch_facebook_sync_item() set search_path='';
+create or replace function public.claim_facebook_episode_queue() returns table(episode_id uuid,episode_url text,attempts integer)
+language plpgsql security invoker set search_path='' as $$ begin raise exception 'Legacy upload client retired; use claim_facebook_upload'; end $$;
