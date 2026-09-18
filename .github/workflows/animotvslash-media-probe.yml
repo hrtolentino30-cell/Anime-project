@@ -29,4 +29,7 @@ jobs:
       - name: Resolve player candidates
         env:
           ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
+          FACEBOOK_INGEST_URL: ${{ secrets.FACEBOOK_INGEST_URL }}
+          FACEBOOK_INGEST_SECRET: ${{ secrets.FACEBOOK_INGEST_SECRET }}
+          ANIMORI_SYNC_SOURCE_URL: ${{ secrets.ANIMORI_SYNC_SOURCE_URL }}
         run: node scripts/animotvslash-media-probe.mjs
