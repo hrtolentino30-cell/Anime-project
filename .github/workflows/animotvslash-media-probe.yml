@@ -8,6 +8,11 @@ on:
         required: false
         default: ""
 
+  push:
+    branches: [main]
+    paths:
+      - "scripts/animotvslash-media-probe.mjs"
+      - ".github/workflows/animotvslash-media-probe.yml"
   schedule:
     - cron: "*/10 * * * *"
 
