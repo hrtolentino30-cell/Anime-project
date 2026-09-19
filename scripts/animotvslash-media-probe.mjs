@@ -177,8 +177,10 @@ try {
     const fd=openSync(out,'r');
     try {
       while (Number(state.start_offset)<Number(state.end_offset)) {
-        const start=Number(state.start_offset), end=Number(state.end_offset);
-        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start<0 || end>size || end<=start) throw new Error('Invalid Meta upload offsets');
+        const start=Number(state.start_offset), rawEnd=Number(state.end_offset);
+        const end=Math.min(rawEnd, size);
+        if (start >= size) break;
+        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(rawEnd) || !Number.isSafeInteger(end) || start<0 || end<=start) throw new Error('Invalid Meta upload offsets');
         const buf=Buffer.alloc(end-start), got=readSync(fd,buf,0,buf.length,start);
         if (got!==buf.length) throw new Error('Unexpected end of media file');
         state=await api('transfer',buf,'&start_offset='+start);
