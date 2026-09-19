@@ -134,7 +134,26 @@ try {
       if (probe.status!==0) continue;
       const info=JSON.parse(probe.stdout), video=info.streams?.find(s=>s.codec_type==='video'), audio=info.streams?.find(s=>s.codec_type==='audio');
       const duration=Number(info.format?.duration), audioDuration=Number(audio?.duration || duration);
-      if (!video || !audio || video.height<480 || duration<300 || audioDuration<duration-10) { console.error('MEDIA_VALIDATION_FAILED: full episode, >=480p and full-length audio required'); continue; }
+      // Some source episodes are genuine shorts. Only accept a short when the
+      // page explicitly declared this MP4 and an independent source probe confirms its full duration.
+      let completeShort = false;
+      if (duration >= 30 && duration < 300 && declared.includes(hls) && /\.mp4(?:\?|$)/i.test(hls)) {
+        const sourceProbe = spawnSync('ffprobe', ['-v','error','-rw_timeout','15000000',
+          ...(inputHeaders ? ['-headers',inputHeaders] : []),
+          '-show_entries','format=duration','-of','json',hls],
+          {encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+        if (sourceProbe.status === 0) {
+          try {
+            const expected = Number(JSON.parse(sourceProbe.stdout).format?.duration);
+            completeShort = Number.isFinite(expected) && expected >= 30 && Math.abs(duration - expected) <= 2;
+            if (completeShort) console.log('DECLARED_SHORT_DURATION_VERIFIED=' + expected);
+          } catch {}
+        }
+      }
+      if (!video || !audio || video.height<480 || !Number.isFinite(duration) || !Number.isFinite(audioDuration) ||
+          (duration<300 && !completeShort) || audioDuration<duration-Math.min(10,duration*0.02)) {
+        console.error('MEDIA_VALIDATION_FAILED: complete declared episode, >=480p and full-length audio required'); continue;
+      }
       console.log(`MEDIA_VALIDATED=${video.width}x${video.height} duration=${duration} audio=${audio.codec_name}`);
       ready=true; break;
     }
