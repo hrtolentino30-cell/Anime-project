@@ -74,7 +74,7 @@ begin
  and not exists(select 1 from public.facebook_episode_queue other join public.episodes oe on oe.id=other.episode_id
  where oe.anime_id=e.anime_id and oe.episode_number=e.episode_number and other.episode_id<>f.episode_id
  and (other.status in ('processing','published') or other.upload_started))
- order by f.priority desc,f.created_at for update of f skip locked limit 1;
+ order by f.finish_accepted desc,f.priority desc,f.attempts asc,f.created_at for update of f skip locked limit 1;
  if not found then return null; end if;
  update public.facebook_episode_queue set status='processing',claimed_at=now(),attempts=attempts+1
  where episode_id=q.episode_id returning to_jsonb(facebook_episode_queue.*) into result;

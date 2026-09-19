@@ -1,3 +1,4 @@
+import { episodePlayerUrls, finiteHlsDuration, confirmedHlsShort } from './facebook-hls-validation.mjs';
 import { declaredMedia } from './animotvslash-declared-media.mjs';
 import { chromium } from 'playwright';
 import { spawnSync } from 'node:child_process';
@@ -57,14 +58,28 @@ try {
     browser = await chromium.launch({headless:true});
     const context = await browser.newContext();
     const page = await context.newPage();
-    const hits = new Map();
+    const hits = new Map(), hlsEvidence = new Map(), manifestReads = [];
+    let declaredPlayers = new Set();
     page.on('response', r => {
       const u=r.url();
-      if (r.ok() && /\.m3u8(?:\?|$)/i.test(u)) hits.set(u,r.request().headers());
+      if (r.ok() && /\.m3u8(?:\?|$)/i.test(u)) {
+        hits.set(u,r.request().headers());
+        let trustedPlayer = false;
+        try {
+          for (let frame = r.request().frame(); frame; frame = frame.parentFrame()) {
+            if (declaredPlayers.has(frame.url())) { trustedPlayer = true; break; }
+          }
+        } catch {}
+        manifestReads.push(r.text().then(text => {
+          hlsEvidence.set(u, {trustedPlayer, expected: finiteHlsDuration(text)});
+        }).catch(() => {}));
+      }
     });
     const response = await page.goto(job.episode_url,{waitUntil:'domcontentloaded',timeout:60000});
     if (!response?.ok()) throw new Error('Episode page failed: ' + response?.status());
-    const declared = declaredMedia(await response.text(), job.episode_url);
+    const episodeHtml = await response.text();
+    declaredPlayers = episodePlayerUrls(episodeHtml, job.episode_url);
+    const declared = declaredMedia(episodeHtml, job.episode_url);
     const browserAgent = await page.evaluate(() => navigator.userAgent);
     for (const media of declared) hits.set(media, {referer: job.episode_url, 'user-agent': browserAgent});
     console.log('DECLARED_MEDIA_COUNT=' + declared.length);
@@ -99,6 +114,7 @@ try {
       }
       await page.waitForTimeout(1500);
     }
+    await Promise.allSettled(manifestReads);
     console.log('PLAYER_FRAMES=' + JSON.stringify(page.frames().map(f=>f.url())));
     // ANIMOTVSLASH embeds the authorized Rumble playlist directly in its jw-player payload.
     // Browser autoplay can be blocked, so recover that declared playlist without depending on playback starting.
@@ -135,6 +151,10 @@ try {
       if (probe.status!==0) continue;
       const info=JSON.parse(probe.stdout), video=info.streams?.find(s=>s.codec_type==='video'), audio=info.streams?.find(s=>s.codec_type==='audio');
       const duration=Number(info.format?.duration), audioDuration=Number(audio?.duration || duration);
+      console.log('MEDIA_PROBE=' + JSON.stringify({host:new URL(hls).host,
+        width:video?.width,height:video?.height,duration,
+        videoDuration:video?.duration,audioDuration:audio?.duration,
+        hlsEvidence:hlsEvidence.get(hls) || null}));
       // Some source episodes are genuine shorts. Only accept a short when the
       // page explicitly declared this MP4 and an independent source probe confirms its full duration.
       let completeShort = false;
@@ -148,6 +168,22 @@ try {
             const expected = Number(JSON.parse(sourceProbe.stdout).format?.duration);
             completeShort = Number.isFinite(expected) && expected >= 30 && Math.abs(duration - expected) <= 2;
             if (completeShort) console.log('DECLARED_SHORT_DURATION_VERIFIED=' + expected);
+          } catch {}
+        }
+      }
+      const evidence = hlsEvidence.get(hls);
+      if (duration >= 30 && duration < 300 && evidence?.trustedPlayer &&
+          Number.isFinite(evidence.expected) && Math.abs(duration - evidence.expected) <= 2) {
+        const sourceProbe = spawnSync('ffprobe', ['-v','error','-rw_timeout','15000000',
+          ...(inputHeaders ? ['-headers',inputHeaders] : []),
+          '-show_entries','format=duration','-of','json',hls],
+          {encoding:'utf8',timeout:30000,maxBuffer:1024*1024});
+        if (sourceProbe.status === 0) {
+          try {
+            completeShort = confirmedHlsShort({...evidence,
+              source:Number(JSON.parse(sourceProbe.stdout).format?.duration),
+              output:duration,video:Number(video?.duration),audio:Number(audio?.duration)});
+            if (completeShort) console.log('DECLARED_HLS_SHORT_VERIFIED=' + evidence.expected);
           } catch {}
         }
       }
