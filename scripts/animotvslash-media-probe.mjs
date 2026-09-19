@@ -128,7 +128,7 @@ try {
       if (cookies && !Object.keys(headers).some(k=>k.toLowerCase()==='cookie')) replayHeaders.push(`Cookie: ${cookies}\r\n`);
       const inputHeaders=replayHeaders.join('');
       console.log('MEDIA_REPLAY_HEADER_NAMES=' + JSON.stringify(replayHeaders.map(x=>x.split(':',1)[0])));
-      const ff=spawnSync('ffmpeg',['-y','-nostdin','-rw_timeout','30000000','-http_persistent','0',...(inputHeaders ? ['-headers',inputHeaders] : []),'-i',hls,'-c:v','copy','-c:a','aac','-b:a','192k','-movflags','+faststart',out],{encoding:'utf8',timeout:480000,maxBuffer:8*1024*1024});
+      const ff=spawnSync('ffmpeg',['-y','-nostdin','-rw_timeout','30000000',...(/\.m3u8(?:\?|$)/i.test(hls) ? ['-http_persistent','0'] : []),...(inputHeaders ? ['-headers',inputHeaders] : []),'-i',hls,'-c:v','copy','-c:a','aac','-b:a','192k','-movflags','+faststart',out],{encoding:'utf8',timeout:480000,maxBuffer:8*1024*1024});
       if (ff.status!==0) { console.error('MEDIA_REMUX_FAILED='+(ff.stderr || ff.error?.message || '').slice(-1600)); continue; }
       const probe=spawnSync('ffprobe',['-v','error','-show_streams','-show_format','-of','json',out],{encoding:'utf8',timeout:30000});
       if (probe.status!==0) continue;
