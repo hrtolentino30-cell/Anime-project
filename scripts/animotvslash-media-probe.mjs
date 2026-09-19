@@ -1,3 +1,4 @@
+import { declaredMedia } from './animotvslash-declared-media.mjs';
 import { chromium } from 'playwright';
 import { spawnSync } from 'node:child_process';
 import { statSync, openSync, readSync, closeSync } from 'node:fs';
@@ -62,11 +63,25 @@ try {
     });
     const response = await page.goto(job.episode_url,{waitUntil:'domcontentloaded',timeout:60000});
     if (!response?.ok()) throw new Error('Episode page failed: ' + response?.status());
+    const declared = declaredMedia(await response.text(), job.episode_url);
+    const browserAgent = await page.evaluate(() => navigator.userAgent);
+    for (const media of declared) hits.set(media, {referer: job.episode_url, 'user-agent': browserAgent});
+    console.log('DECLARED_MEDIA_COUNT=' + declared.length);
     const title = (await page.title()).replace(/\s*[-|–—:]?\s*ANIMOTVSLASH\s*$/i,'').trim();
     // Interact inside embedded frames: the old worker only clicked the outer document.
     const deadline = Date.now() + 65000;
     const clicked = new Set();
+    // Exercise the page's ordinary mirror selector, instead of retrying only the default CDN.
+    const mirror = page.locator('select.mirror').first();
+    const mirrorValues = await mirror.locator('option').evaluateAll(options => options
+      .filter(o => o.value && !/dub|animepahe/i.test(o.textContent || ''))
+      .map(o => o.value)).catch(() => []);
+    let mirrorIndex = 1, nextMirrorAt = Date.now() + 12000;
     while (Date.now() < deadline) {
+      if (!declared.length && Date.now() >= nextMirrorAt && mirrorIndex < Math.min(mirrorValues.length, 5)) {
+        await mirror.selectOption(mirrorValues[mirrorIndex++], {timeout:3000}).catch(() => {});
+        nextMirrorAt = Date.now() + 12000;
+      }
       for (const frame of page.frames()) {
         if (frame.isDetached()) continue;
         await frame.locator('video').evaluateAll(videos => videos.forEach(v => { v.muted=true; v.play().catch(()=>{}); })).catch(()=>{});
@@ -95,8 +110,9 @@ try {
         if (/^https:\/\/rumble\.com\/hls-vod\/.*\.m3u8(?:\?|$)/i.test(cfg.url || '')) hits.set(cfg.url,{});
       } catch {}
     }
-    if (!hits.size) throw new Error('No full HLS source found after activating embedded players');
-    const candidateRank = u => /rumble\.com\/hls-vod\//i.test(u) ? 0 : /mega\/fetch\.nexabloom\.top/i.test(u) ? 2 : 1;
+    if (!hits.size) throw new Error('No declared MP4 or HLS source found after activating embedded players');
+    const declaredRanks = new Map(declared.map((u, i) => [u, -100 + i]));
+    const candidateRank = u => declaredRanks.has(u) ? declaredRanks.get(u) : /rumble\.com\/hls-vod\//i.test(u) ? 0 : /mega\/fetch\.nexabloom\.top/i.test(u) ? 2 : 1;
     console.log('MEDIA_CANDIDATES=' + JSON.stringify([...hits.keys()].map(u=>({host:new URL(u).host,rank:candidateRank(u)}))));
     const out='/tmp/facebook-upload.mp4';
     let ready=false;
