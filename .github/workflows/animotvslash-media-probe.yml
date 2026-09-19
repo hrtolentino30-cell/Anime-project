@@ -1,13 +1,12 @@
-name: ANIMOTVSLASH media probe
+name: Animori Facebook uploads
 
 on:
   workflow_dispatch:
     inputs:
       episode_url:
-        description: "Optional episode URL; leave blank to process the next queued new episode"
+        description: "Optional episode URL; leave blank to process eligible new episodes"
         required: false
         default: ""
-
   push:
     branches: [main]
   schedule:
@@ -15,16 +14,41 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
+# Only one workflow run at a time; its matrix may contain two isolated runners.
 concurrency:
   group: animori-facebook-auto-upload
   cancel-in-progress: false
 
 jobs:
+  capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      matrix: ${{ steps.slots.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - id: slots
+        name: Select workers for Philippine peak hours
+        env:
+          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
+        run: echo "matrix=$(node scripts/facebook-worker-slots.mjs)" >> "$GITHUB_OUTPUT"
+
   probe:
+    needs: capacity
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.capacity.outputs.matrix) }}
+    name: Facebook upload worker ${{ matrix.slot }}
     runs-on: ubuntu-latest
     timeout-minutes: 24
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -34,11 +58,9 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Install ffmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
-      - name: Resolve player candidates
+      - name: Claim and upload an eligible episode
         env:
           ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
-          FACEBOOK_RESOLVED_MEDIA_URL: ${{ secrets.FACEBOOK_RESOLVED_MEDIA_URL }}
-          MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
+          FACEBOOK_WORKER_SLOT: ${{ matrix.slot }}
           FACEBOOK_UPLOAD_PROXY_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-upload-proxy
         run: node scripts/animotvslash-media-probe.mjs
-
