@@ -21,5 +21,5 @@ export function declaredMedia(html, episodeUrl) {
       } catch {}
     }
   }
-  return [...found];
+  return [...found].sort((a, b) => Number(!/\.mp4(?:\?|$)/i.test(a)) - Number(!/\.mp4(?:\?|$)/i.test(b)));
 }
