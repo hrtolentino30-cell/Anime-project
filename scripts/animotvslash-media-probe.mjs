@@ -52,7 +52,8 @@ try {
   if (job.finish_accepted && job.destination_video_id) {
     await verify(job.destination_video_id);
   } else {
-    if (job.upload_started) throw new Error('Existing upload needs review; refusing a second video');
+    const resumeUpload = Boolean(job.upload_started && job.upload_session_id && job.destination_video_id);
+    if (job.upload_started && !resumeUpload) throw new Error('Existing upload has no resumable session; refusing a second video');
     browser = await chromium.launch({headless:true});
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -160,9 +161,19 @@ try {
     await browser.close(); browser=null;
     if (!ready) throw new Error('No candidate passed full-episode audio/video validation');
     const size=statSync(out).size;
-    let state=await api('start',{file_size:size});
-    const videoId=String(state.video_id);
-    console.log('FACEBOOK_UPLOAD_VIDEO_ID=' + videoId);
+    let state;
+    let videoId;
+    if (resumeUpload) {
+      videoId = String(job.destination_video_id);
+      const offset = Number(job.upload_bytes || 0);
+      if (!Number.isSafeInteger(offset) || offset < 0 || offset >= size) throw new Error('Saved Facebook upload offset is invalid');
+      state = {start_offset: offset, end_offset: Math.min(size, offset + 64 * 1024 * 1024)};
+      console.log('FACEBOOK_UPLOAD_RESUME=' + videoId + ' offset=' + offset + '/' + size);
+    } else {
+      state = await api('start',{file_size:size});
+      videoId = String(state.video_id);
+      console.log('FACEBOOK_UPLOAD_VIDEO_ID=' + videoId);
+    }
     const fd=openSync(out,'r');
     try {
       while (Number(state.start_offset)<Number(state.end_offset)) {
