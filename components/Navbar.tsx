@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Bookmark, Compass, History, Home, Search, UserRound } from 'lucide-react';
+import { Bookmark, Compass, Heart, History, Home, Search, UserRound } from 'lucide-react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NavLink } from './NavLink';
 import { Brand } from './Brand';
@@ -23,6 +23,7 @@ export async function Navbar() {
       <div className="navActions">
         <NavLink href="/search" className="navSearchLink" label="Search"><Search size={19} /></NavLink>
         {user && <><NavLink href="/my-list" label="My List"><Bookmark size={19} /></NavLink><NavLink href="/history" label="History"><History size={19} /></NavLink></>}
+        <NavLink href="/support" className="navSupport" label="Support"><Heart size={18} /><span>Support</span></NavLink>
         <NavLink href={user ? '/account' : '/login'} className="navAccount" label={user ? 'Account' : 'Sign in'}><UserRound size={18} /><span>{user ? 'Account' : 'Sign in'}</span></NavLink>
       </div>
     </header>
