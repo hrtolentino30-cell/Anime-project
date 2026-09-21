@@ -54,15 +54,18 @@ Deno.serve(async req=>{
   const db=serviceClient();
   const {data:reports}=await db.from('episode_reports').select('episode_id').eq('status','open').in('reason',['playback','audio','wrong_episode']).order('created_at',{ascending:false}).limit(10);
   const reportIds=[...new Set((reports??[]).map((r:any)=>String(r.episode_id)))];
-  const {data:recent,error:recentError}=await db.from('episodes').select('id,source_url,source_episode_id,created_at,updated_at').order('created_at',{ascending:false}).limit(24);
+  const {data:degraded}=await db.from('video_sources').select('episode_id').eq('is_active',true).gt('verification_failures',0).order('last_verified_at',{ascending:false}).limit(12);
+  const degradedIds=[...new Set((degraded??[]).map((r:any)=>String(r.episode_id)))];
+  const {data:recent,error:recentError}=await db.from('episodes').select('id,source_url,source_episode_id,created_at,updated_at').order('created_at',{ascending:false}).limit(30);
   if(recentError)return Response.json({error:recentError.message},{status:500});
   const byId=new Map<string,Episode>();
-  if(reportIds.length){
-    const {data:reported}=await db.from('episodes').select('id,source_url,source_episode_id,created_at,updated_at').in('id',reportIds);
-    for(const ep of reported??[])byId.set(ep.id,ep as Episode);
+  const priorityIds=[...new Set([...reportIds,...degradedIds])];
+  if(priorityIds.length){
+    const {data:priority}=await db.from('episodes').select('id,source_url,source_episode_id,created_at,updated_at').in('id',priorityIds);
+    for(const ep of priority??[])byId.set(ep.id,ep as Episode);
   }
-  for(const ep of recent??[])if(byId.size<14)byId.set(ep.id,ep as Episode);
-  const episodes=[...byId.values()].slice(0,14);
+  for(const ep of recent??[])if(byId.size<18)byId.set(ep.id,ep as Episode);
+  const episodes=[...byId.values()].slice(0,18);
   if(!episodes.length)return Response.json({ok:true,checked:0,repairs:0});
   const {data:sources,error}=await db.from('video_sources').select('id,episode_id,source_type,stream_url,embed_url,verification_failures').in('episode_id',episodes.map(e=>e.id)).eq('is_active',true).order('verification_failures',{ascending:true});
   if(error)return Response.json({error:error.message},{status:500});
@@ -95,5 +98,5 @@ Deno.serve(async req=>{
       fetch(url+'/functions/v1/worker',{method:'POST',headers:{'x-cron-secret':secret},body:'{}'}).catch(e=>console.error('immediate worker kick failed',e));
     }
   }
-  return Response.json({ok:true,checked:episodes.length,broken,repairs,reportedRepairs});
+  return Response.json({ok:true,checked:episodes.length,broken,repairs,reportedRepairs,degradedPrioritized:degradedIds.length});
 });
