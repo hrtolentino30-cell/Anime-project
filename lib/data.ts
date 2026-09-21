@@ -48,15 +48,31 @@ const getCachedAnimeBySlug=unstable_cache(async(slug:string)=>{
 
 export async function getAnimeBySlug(slug:string){return getCachedAnimeBySlug(slug)}
 
-function orderVideoSources<T extends {source_type?:string|null;server_name?:string|null;created_at?:string|null}>(sources:T[]){
-  const rank=(type?:string|null)=>type==='hls'?0:type==='mp4'?1:type==='embed'?2:3;
+function orderVideoSources<T extends {source_type?:string|null;server_name?:string|null;embed_url?:string|null;stream_url?:string|null;verification_failures?:number|null;last_verified_at?:string|null;created_at?:string|null}>(sources:T[]){
+  const typeRank=(source:T)=>source.source_type==='hls'?0:source.source_type==='mp4'?10:20;
+  const hostRank=(source:T)=>{
+    const raw=source.stream_url??source.embed_url??'';
+    try{
+      const host=new URL(raw).hostname.toLowerCase();
+      if(host==='tryembed.us.cc'||host.endsWith('.tryembed.us.cc'))return 0;
+      if(host.includes('animotvslash'))return 20;
+      if(host.includes('vidnest'))return 40;
+      if(host.includes('megaplay'))return 50;
+      return 10;
+    }catch{return 30}
+  };
+  const healthRank=(source:T)=>{
+    const failures=Number(source.verification_failures??0);
+    if(failures>=2)return 80;
+    if(failures===1)return 30;
+    const verified=source.last_verified_at?Date.parse(source.last_verified_at):NaN;
+    return Number.isFinite(verified)&&Date.now()-verified<=12*60*60*1000?0:10;
+  };
   return [...sources].sort((a,b)=>{
-    const byType=rank(a.source_type)-rank(b.source_type);
-    if(byType!==0)return byType;
-    const aDefault=(a.server_name??'').toLowerCase()==='default'?0:1;
-    const bDefault=(b.server_name??'').toLowerCase()==='default'?0:1;
-    if(aDefault!==bDefault)return aDefault-bDefault;
-    return String(a.created_at??'').localeCompare(String(b.created_at??''));
+    const scoreA=typeRank(a)+hostRank(a)+healthRank(a);
+    const scoreB=typeRank(b)+hostRank(b)+healthRank(b);
+    if(scoreA!==scoreB)return scoreA-scoreB;
+    return String(b.last_verified_at??b.created_at??'').localeCompare(String(a.last_verified_at??a.created_at??''));
   });
 }
 
@@ -73,7 +89,7 @@ const getCachedWatchCore=unstable_cache(async(episodeId:string)=>{
   const fallback=ordered.filter((source:any)=>source.source_type!=='hls'&&source.source_type!=='mp4');
   const usable=direct.length?[...direct,...fallback.slice(0,3)]:ordered.slice(0,6);
   return {episode,sources:usable,siblings:siblings??[]};
-},['animori-watch-core-v6'],{revalidate:60});
+},['animori-watch-core-v7'],{revalidate:60});
 
 export async function getWatchData(episodeId:string){
   const [core,db]=await Promise.all([getCachedWatchCore(episodeId),createSupabaseServerClient()]);
