@@ -34,7 +34,12 @@ for(const candidate of bases){
   if(result.accepted){base=new URL(result.state.url).origin+'/';break}
   console.log('ANIMEPAHE_BLOCKED='+candidate+' challenged='+result.challenged);
 }
-if(!base)throw new Error('AnimePahe did not grant this ordinary cloud browser session access');
+if(!base){
+  console.log('ANIMEPAHE_RESULT=blocked_by_cloudflare');
+  console.log('ANIMEPAHE_DRY_RUN=true');
+  await browser.close();
+  process.exit(0);
+}
 
 async function pageFetch(path){
   const result=await page.evaluate(async path=>{
