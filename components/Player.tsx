@@ -38,6 +38,7 @@ type PlayerProps = {
   animeTitle: string;
   episodeNumber: number | string;
   episodeTitle?: string | null;
+  backdropUrl?: string | null;
   sources: VideoSource[];
   siblings: SiblingEpisode[];
   userId: string | null;
@@ -73,6 +74,7 @@ export function Player({
   animeTitle,
   episodeNumber,
   episodeTitle,
+  backdropUrl,
   sources,
   siblings,
   userId,
@@ -111,6 +113,7 @@ export function Player({
   const [notice, setNotice] = useState('');
   const [controlsVisible, setControlsVisible] = useState(false);
   const [playbackStarted, setPlaybackStarted] = useState(false);
+  const [immersive, setImmersive] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
   const [reactionOpen, setReactionOpen] = useState(false);
   const [autoplayCancelled, setAutoplayCancelled] = useState(false);
@@ -190,18 +193,26 @@ export function Player({
     if (!force && now - cloudSaveAtRef.current < CLOUD_SAVE_INTERVAL_MS) return;
     cloudSaveAtRef.current = now;
 
-    const db = createSupabaseBrowserClient();
-    const result = await db.from('playback_progress').upsert({
-      user_id: userId,
-      episode_id: episodeId,
-      anime_id: animeId,
-      position_seconds: seconds,
-      duration_seconds: duration || null,
-      completed: done,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,episode_id' });
-
-    if (result.error) setNotice('Progress could not be saved.');
+    try {
+      const response = await fetch('/api/player/progress', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        keepalive: force,
+        body: JSON.stringify({
+          episodeId,
+          animeId,
+          positionSeconds: seconds,
+          durationSeconds: duration || null,
+          completed: done,
+        }),
+      });
+      if (!response.ok && response.status !== 401) {
+        console.warn('[player] cloud progress save failed', response.status);
+      }
+    } catch (error) {
+      console.warn('[player] cloud progress save unavailable', error);
+    }
   }, [animeId, embedMode, episodeId, qaMode, userId]);
 
   const navigateEpisode = useCallback(async (target?: SiblingEpisode) => {
@@ -493,38 +504,71 @@ export function Player({
     root.classList.toggle('bbp-device-landscape', Boolean(deviceLandscape));
   }, [embedMode]);
 
+  const setImmersiveMode = useCallback((active: boolean) => {
+    setImmersive(active);
+    document.body.classList.toggle('animori-player-immersive', active);
+    if (!active) {
+      try {
+        const orientation = (screen as any).orientation as { unlock?: () => void } | undefined;
+        orientation?.unlock?.();
+      } catch {}
+    }
+    requestAnimationFrame(syncLayout);
+  }, [syncLayout]);
+
   const enterLandscapeFullscreen = useCallback(() => {
     const root = rootRef.current;
-    const video = videoRef.current;
     if (!root) return;
 
-    const doc = document as Document & { webkitFullscreenElement?: Element | null };
-    if (document.fullscreenElement || doc.webkitFullscreenElement) return;
+    setImmersiveMode(true);
 
-    const element = root as HTMLDivElement & { webkitRequestFullscreen?: () => void };
-    const media = video as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
-    const orientation = (screen as any).orientation as { lock?: (orientation: 'landscape') => Promise<void> } | undefined;
+    const isAppleTouch =
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const orientation = (screen as any).orientation as {
+      lock?: (orientation: 'landscape') => Promise<void>;
+    } | undefined;
 
-    try {
-      if (root.requestFullscreen) {
-        const request = root.requestFullscreen();
-        void request.then(async () => {
+    // iPhone Safari's video fullscreen replaces our UI with Apple's native
+    // controls. Keep the DOM player immersive instead, and rotate the custom
+    // canvas in portrait via CSS. Other browsers can use element fullscreen.
+    if (isAppleTouch) {
+      try { void orientation?.lock?.('landscape'); } catch {}
+      return;
+    }
+
+    if (!document.fullscreenElement && root.requestFullscreen) {
+      void root.requestFullscreen()
+        .then(async () => {
           try { await orientation?.lock?.('landscape'); } catch {}
           syncLayout();
-        }).catch(() => {
-          try { media?.webkitEnterFullscreen?.(); } catch {}
+        })
+        .catch(() => {
+          // CSS immersive mode remains active when the Fullscreen API is denied.
         });
-      } else if (element.webkitRequestFullscreen) {
-        element.webkitRequestFullscreen();
-        try { void orientation?.lock?.('landscape'); } catch {}
-        syncLayout();
-      } else {
-        media?.webkitEnterFullscreen?.();
-      }
-    } catch {
-      try { media?.webkitEnterFullscreen?.(); } catch {}
     }
-  }, [syncLayout]);
+  }, [setImmersiveMode, syncLayout]);
+
+  const exitLandscapeFullscreen = useCallback(async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+    } catch {}
+    setImmersiveMode(false);
+    setPanel(null);
+    setReactionOpen(false);
+    showControls();
+  }, [setImmersiveMode, showControls]);
+
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (!document.fullscreenElement && immersive) setImmersiveMode(false);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.body.classList.remove('animori-player-immersive');
+    };
+  }, [immersive, setImmersiveMode]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -823,30 +867,13 @@ export function Player({
   }, [emit, episodeId, navigateEpisode, siblings, source?.id]);
 
   const toggleFullscreen = useCallback(async () => {
-    const root = rootRef.current;
-    const video = videoRef.current;
-    if (!root) return;
-    const doc = document as Document & {
-      webkitFullscreenElement?: Element | null;
-      webkitExitFullscreen?: () => Promise<void> | void;
-    };
-    const element = root as HTMLDivElement & { webkitRequestFullscreen?: () => void };
-    const media = video as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
-    const orientation = (screen as any).orientation as { lock?: (orientation: 'landscape') => Promise<void>; unlock?: () => void } | undefined;
-    try {
-      if (document.fullscreenElement || doc.webkitFullscreenElement) {
-        try { orientation?.unlock?.(); } catch {}
-        if (document.fullscreenElement) await document.exitFullscreen();
-        else await doc.webkitExitFullscreen?.();
-      } else {
-        enterLandscapeFullscreen();
-      }
-    } catch {
-      try { media?.webkitEnterFullscreen?.(); } catch {}
+    if (immersive || document.fullscreenElement) {
+      await exitLandscapeFullscreen();
+      return;
     }
-    syncLayout();
+    enterLandscapeFullscreen();
     showControls();
-  }, [enterLandscapeFullscreen, showControls, syncLayout]);
+  }, [enterLandscapeFullscreen, exitLandscapeFullscreen, immersive, showControls]);
 
   const startPlayback = useCallback(() => {
     playbackStartedRef.current = true;
@@ -968,7 +995,7 @@ export function Player({
   return <div className="animoriBbpHost">
     <div
       ref={rootRef}
-      className={`bbp-root ${controlsVisible ? 'bbp-controls' : ''}`}
+      className={`bbp-root ${controlsVisible ? 'bbp-controls' : ''} ${immersive ? 'bbp-immersive' : ''}`}
       onPointerDown={beginHold}
       onPointerMove={() => { if (playbackStartedRef.current) showControls(); }}
       onWheel={onWheel}
@@ -985,6 +1012,7 @@ export function Player({
         className={`bbp-video ${embedMode ? 'bbp-hidden' : ''}`}
         playsInline
         preload="metadata"
+        poster={backdropUrl || undefined}
         controlsList="nodownload noremoteplayback"
         disableRemotePlayback
         onClick={() => {
@@ -1012,6 +1040,10 @@ export function Player({
           if (embedMode) failActiveSource('This embedded player failed to load.', true);
         }}
       />
+      {!playbackStarted && <div
+        className="bbp-preplayVisual"
+        style={backdropUrl ? { backgroundImage: `url("${backdropUrl.replace(/"/g, '%22')}")` } : undefined}
+      />}
       <div className="bbp-shade" />
 
       {(loading || failure) && <div className="bbp-loading">
@@ -1033,39 +1065,15 @@ export function Player({
 
       {playbackStarted && <div className="bbp-top bbp-chrome">
         <button className="bbp-circle" type="button" onClick={() => void closeToAnime()} aria-label="Back to anime">×</button>
-        <button className="bbp-circle" type="button" onClick={() => { setPanel('more'); showControls(true); }} aria-label="More options">•••</button>
-      </div>}
-
-      {playbackStarted && <section
-        className="bbp-title bbp-chrome"
-        role="button"
-        tabIndex={0}
-        onClick={() => { setPanel('episodes'); showControls(true); }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            setPanel('episodes');
-            showControls(true);
-          }
-        }}
-      >
-        <div className="kicker"><span>EP {String(episodeNumber).padStart(2, '0')}</span><span>{episodeIndex + 1} / {siblings.length}</span></div>
-        <h1>{animeTitle}</h1>
-        <p>{episodeTitle || `Episode ${episodeNumber}`}</p>
-      </section>}
-
-      {playbackStarted && <aside className="bbp-actions bbp-chrome">
-        <button type="button" onClick={() => { setPanel('episodes'); showControls(true); }}><b>☷</b><small>Episodes</small></button>
-        <button type="button" disabled={favoriteBusy} onClick={() => void toggleFavorite()}><b>{favorite ? '✓' : '＋'}</b><small>My List</small></button>
-        <button type="button" onClick={() => { setReactionOpen((value) => !value); showControls(true); }} aria-expanded={reactionOpen}><b>☺</b><small>React</small></button>
-        <button type="button" onClick={() => void share()}><b>↗</b><small>Share</small></button>
-      </aside>}
-
-      {playbackStarted && reactionOpen && <div className="bbp-react">
-        <button type="button" onClick={() => void sendReaction('heart')} aria-label="Love">❤️</button>
-        <button type="button" onClick={() => void sendReaction('shock')} aria-label="Shocked">😱</button>
-        <button type="button" onClick={() => void sendReaction('laugh')} aria-label="Funny">😂</button>
-        <button type="button" onClick={() => void sendReaction('fire')} aria-label="Fire">🔥</button>
+        <div className="bbp-topMeta" role="button" tabIndex={0} onClick={() => { setPanel('episodes'); showControls(true); }}>
+          <strong>{animeTitle}</strong>
+          <span>EP {String(episodeNumber).padStart(2, '0')} · {episodeIndex + 1}/{siblings.length}</span>
+        </div>
+        <div className="bbp-topActions">
+          <button className="bbp-circle" type="button" onClick={() => { setPanel('episodes'); showControls(true); }} aria-label="Episodes">☷</button>
+          {immersive && <button className="bbp-circle" type="button" onClick={() => void exitLandscapeFullscreen()} aria-label="Exit fullscreen">↙</button>}
+          <button className="bbp-circle" type="button" onClick={() => { setPanel('more'); showControls(true); }} aria-label="More options">•••</button>
+        </div>
       </div>}
 
       {!loading && !failure && !playbackStarted && <div className="bbp-start">
@@ -1141,8 +1149,19 @@ export function Player({
             onClick={() => switchServer(item)}
           >{item.label}<small>{item.type === 'direct' ? 'MP4 / direct' : item.type.toUpperCase()}</small></button>)}
         </div>
+        <div className="bbp-quick-actions">
+          <button type="button" disabled={favoriteBusy} onClick={() => void toggleFavorite()}>{favorite ? '✓ In My List' : '＋ My List'}</button>
+          <button type="button" onClick={() => void share()}>↗ Share</button>
+          <button type="button" onClick={() => setReactionOpen((value) => !value)}>☺ React</button>
+        </div>
+        {reactionOpen && <div className="bbp-react bbp-react-panel">
+          <button type="button" onClick={() => void sendReaction('heart')} aria-label="Love">❤️</button>
+          <button type="button" onClick={() => void sendReaction('shock')} aria-label="Shocked">😱</button>
+          <button type="button" onClick={() => void sendReaction('laugh')} aria-label="Funny">😂</button>
+          <button type="button" onClick={() => void sendReaction('fire')} aria-label="Fire">🔥</button>
+        </div>}
         <div className="bbp-server-list">
-          <button type="button" onClick={() => void toggleFullscreen()}>Landscape / fullscreen</button>
+          <button type="button" onClick={() => void toggleFullscreen()}>{immersive ? 'Exit fullscreen' : 'Landscape fullscreen'}</button>
           <button type="button" onClick={surpriseMe}>Surprise Me</button>
           <button type="button" onClick={() => openReport()}>Report issue</button>
         </div>
