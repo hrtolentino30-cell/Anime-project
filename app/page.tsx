@@ -13,10 +13,6 @@ export default async function Home() {
   const hero = data.updatedAnime.find((a: any) => a.banner_url || a.poster_url) ?? data.updatedAnime[0];
   const latest = data.latestEpisodes.slice(0, 6);
   const recentlyUpdated = data.updatedAnime.filter((a: any) => a.id !== hero?.id).slice(0, 8);
-  const trending = [...data.updatedAnime].filter((a: any) => Number(a.rating) > 0)
-    .sort((a: any, b: any) => (b.rating ?? 0) - (a.rating ?? 0))
-    .slice(0, 8);
-
   return <div className="homePage">
     <div className="homeLead pageWidth">
       <Hero anime={hero} />
@@ -59,7 +55,7 @@ export default async function Home() {
     </section>}
 
     <Shelf eyebrow="FRESH" title="Recently updated" href="/browse" items={recentlyUpdated} />
-    <Shelf eyebrow="FROM RECENT UPDATES" title="Highly rated" href="/browse?sort=rating" items={trending} />
+    <Shelf eyebrow="ALL-TIME" title="Highly rated" href="/browse?sort=rating" items={data.highlyRated.slice(0, 8)} />
     <Shelf eyebrow="FOLLOW THE STORY" title="Airing now" href="/browse?status=Ongoing" items={data.seasonal.slice(0, 8)} />
 
     <div className="homeMiniShelves pageWidth">
