@@ -4,7 +4,7 @@ import type { VideoSource } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-type QaCase = 'mp4' | 'hls' | 'relay' | 'failover' | 'embed';
+type QaCase = 'mp4' | 'hls' | 'relay' | 'failover' | 'servers' | 'embed';
 
 const episodeId = '9517df52-255a-4216-998b-08629b519a94';
 const animeId = '1cca92f2-b677-4202-9edb-c4ab13ce1857';
@@ -42,6 +42,23 @@ function fixtures(kind: QaCase): VideoSource[] {
     stream_url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
   }];
 
+  if (kind === 'servers') return [
+    {
+      ...base,
+      id: 'qa-server-mp4',
+      server_name: 'QA MP4 Server',
+      source_type: 'mp4',
+      stream_url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+    },
+    {
+      ...base,
+      id: 'qa-server-hls',
+      server_name: 'QA HLS Server',
+      source_type: 'hls',
+      stream_url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+    },
+  ];
+
   if (kind === 'embed') return [{
     ...base,
     id: 'qa-embed',
@@ -65,6 +82,13 @@ function fixtures(kind: QaCase): VideoSource[] {
       server_name: 'Filtered Expired',
       source_type: 'hls',
       stream_url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8?expires=1',
+    },
+    {
+      ...base,
+      id: 'qa-guard-blocked',
+      server_name: 'QA Guard Blocked',
+      source_type: 'hls',
+      stream_url: 'https://doubleclick.net/video.m3u8',
     },
     {
       ...base,
@@ -92,7 +116,7 @@ export default async function PlayerQaPage({
   const params = await searchParams;
   const requested = params.case;
   const kind: QaCase =
-    requested === 'hls' || requested === 'relay' || requested === 'failover' || requested === 'embed'
+    requested === 'hls' || requested === 'relay' || requested === 'failover' || requested === 'servers' || requested === 'embed'
       ? requested
       : 'mp4';
 
