@@ -3,6 +3,7 @@ import './globals.css';
 import './polish.css';
 import './experience.css';
 import './final-polish.css';
+import './player.css';
 import { Header } from '@/components/Header';
 import { Brand } from '@/components/Brand';
 import Link from 'next/link';
