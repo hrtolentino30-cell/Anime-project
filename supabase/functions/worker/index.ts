@@ -12,10 +12,12 @@ function errorMessage(error:unknown){
   return String(error)
 }
 
-function capacity(backlog:number){
-  // Supabase Free stays stable with the proven 8-job sequential batch.
-  // Throughput comes from a 30-second cron cadence, not heavier single invocations.
-  return{limit:Math.max(1,Math.min(8,backlog||1)),concurrency:1};
+function capacity(backlog:number,urgentRepairs:number){
+  // Older repair pages can resolve many dynamic mirrors and are heavier than
+  // normal discovery jobs. Keep repair batches smaller, while normal sync
+  // still drains at the proven 8-job sequential rate.
+  const max=urgentRepairs>0?4:8;
+  return{limit:Math.max(1,Math.min(max,backlog||1)),concurrency:1};
 }
 
 Deno.serve(async req=>{
@@ -28,12 +30,16 @@ Deno.serve(async req=>{
   await db.rpc('recover_stale_sync_jobs',{p_age:'3 minutes'});
 
   const now=new Date().toISOString();
-  const{count:backlog,error:backlogError}=await db.from('sync_queue').select('id',{count:'exact',head:true}).eq('status','pending').lte('available_at',now);
-  if(backlogError)return Response.json({error:backlogError.message},{status:500});
+  const[{count:backlog,error:backlogError},{count:urgentRepairs,error:urgentError}]=await Promise.all([
+    db.from('sync_queue').select('id',{count:'exact',head:true}).eq('status','pending').lte('available_at',now),
+    db.from('sync_queue').select('id',{count:'exact',head:true}).eq('status','pending').lte('available_at',now).lte('priority',2)
+  ]);
+  if(backlogError||urgentError)return Response.json({error:(backlogError??urgentError)?.message},{status:500});
   const pending=Math.max(0,Number(backlog??0));
-  const mode=capacity(pending);
+  const urgent=Math.max(0,Number(urgentRepairs??0));
+  const mode=capacity(pending,urgent);
 
-  const{data:run,error:runError}=await db.from('sync_runs').insert({run_type:'worker',details:{backlog:pending,batch_limit:mode.limit,concurrency:mode.concurrency}}).select('id').single();
+  const{data:run,error:runError}=await db.from('sync_runs').insert({run_type:'worker',details:{backlog:pending,urgent_repairs:urgent,batch_limit:mode.limit,concurrency:mode.concurrency}}).select('id').single();
   if(runError)return Response.json({error:runError.message},{status:500});
 
   const{data:jobs,error}=await db.rpc('claim_sync_jobs',{p_limit:mode.limit});
@@ -86,8 +92,8 @@ Deno.serve(async req=>{
     finished_at:new Date().toISOString(),
     items_scanned:list.length,
     ...stats,
-    details:{backlog_before:pending,backlog_after:Number(remaining??0),batch_limit:mode.limit,concurrency:mode.concurrency}
+    details:{backlog_before:pending,backlog_after:Number(remaining??0),urgent_repairs:urgent,batch_limit:mode.limit,concurrency:mode.concurrency}
   }).eq('id',run.id);
 
-  return Response.json({ok:true,runId:run.id,processed:list.length,backlogBefore:pending,backlogAfter:Number(remaining??0),batchLimit:mode.limit,concurrency:mode.concurrency,...stats})
+  return Response.json({ok:true,runId:run.id,processed:list.length,backlogBefore:pending,backlogAfter:Number(remaining??0),urgentRepairs:urgent,batchLimit:mode.limit,concurrency:mode.concurrency,...stats})
 });
