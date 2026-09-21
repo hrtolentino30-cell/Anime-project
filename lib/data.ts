@@ -64,7 +64,7 @@ const getCachedWatchCore=unstable_cache(async(episodeId:string)=>{
   const {data:episode,error}=await (db.from('episodes') as any).select('id,anime_id,episode_number,title,thumbnail_url,air_date,created_at,updated_at,anime:anime_id(id,slug,title,title_english,title_japanese,description,poster_url,banner_url,type,status,season,year,rating,duration,latest_episode,total_episodes,source_updated_at,created_at,updated_at)').eq('id',episodeId).single();
   if(error||!episode)return null;
   const [{data:sources},{data:siblings}]=await Promise.all([
-    db.from('video_sources').select('id,server_name,source_type,embed_url,stream_url,quality,language,created_at').eq('episode_id',episodeId).eq('is_active',true).order('created_at',{ascending:true}),
+    db.from('video_sources').select('id,episode_id,server_name,source_type,embed_url,stream_url,quality,language,is_active,verification_failures,last_verified_at,created_at,updated_at').eq('episode_id',episodeId).eq('is_active',true).order('created_at',{ascending:true}),
     db.from('episodes').select('id,episode_number,title').eq('anime_id',episode.anime_id).order('episode_number',{ascending:true}),
   ]);
   const ordered=orderVideoSources(sources??[]);
@@ -72,7 +72,7 @@ const getCachedWatchCore=unstable_cache(async(episodeId:string)=>{
   const fallback=ordered.filter((source:any)=>source.source_type!=='hls'&&source.source_type!=='mp4');
   const usable=direct.length?[...direct,...fallback.slice(0,3)]:ordered.slice(0,6);
   return {episode,sources:usable,siblings:siblings??[]};
-},['animori-watch-core-v5'],{revalidate:60});
+},['animori-watch-core-v6'],{revalidate:60});
 
 export async function getWatchData(episodeId:string){
   const [core,db]=await Promise.all([getCachedWatchCore(episodeId),createSupabaseServerClient()]);
