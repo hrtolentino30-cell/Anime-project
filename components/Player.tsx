@@ -922,13 +922,15 @@ export function Player({
       ref={rootRef}
       className={`bbp-root ${controlsVisible ? 'bbp-controls' : ''}`}
       onPointerDown={beginHold}
-      onPointerMove={() => { if (controlsVisible) showControls(); }}
+      onPointerMove={() => showControls()}
       onWheel={onWheel}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onContextMenu={(event) => { if (holdingRef.current || holdTimerRef.current) event.preventDefault(); }}
       data-qa-mode={qaMode ? 'true' : undefined}
+      data-source-id={source.id}
+      data-source-type={source.type}
     >
       <video
         ref={videoRef}
