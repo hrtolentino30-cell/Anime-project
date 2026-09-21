@@ -170,6 +170,12 @@ export function Player({
     }
   }, []);
 
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(''), 2200);
+    return () => clearTimeout(timer);
+  }, [notice]);
+
   const emit = useCallback((eventName: string, sourceId?: string) => {
     if (rootRef.current) rootRef.current.dataset.lastEvent = eventName;
     if (qaMode) return;
@@ -992,7 +998,7 @@ export function Player({
     : currentSeconds;
   const nextSource = portableSources[sourceIndex + 1];
 
-  return <div className="animoriBbpHost">
+  return <div className={`animoriBbpHost ${immersive ? 'animoriBbpHost-immersive' : ''}`}>
     <div
       ref={rootRef}
       className={`bbp-root ${controlsVisible ? 'bbp-controls' : ''} ${immersive ? 'bbp-immersive' : ''}`}
