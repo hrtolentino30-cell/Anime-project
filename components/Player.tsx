@@ -528,30 +528,28 @@ export function Player({
 
     setImmersiveMode(true);
 
-    const isAppleTouch =
-      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const orientation = (screen as any).orientation as {
       lock?: (orientation: 'landscape') => Promise<void>;
     } | undefined;
+    const element = root as HTMLDivElement & { webkitRequestFullscreen?: () => void };
 
-    // iPhone Safari's video fullscreen replaces our UI with Apple's native
-    // controls. Keep the DOM player immersive instead, and rotate the custom
-    // canvas in portrait via CSS. Other browsers can use element fullscreen.
-    if (isAppleTouch) {
-      try { void orientation?.lock?.('landscape'); } catch {}
-      return;
-    }
-
+    // Never call video.webkitEnterFullscreen(): on iPhone that replaces
+    // Animori with Apple's native media UI. Try element fullscreen only; the
+    // CSS immersive landscape canvas remains active if Safari rejects it.
     if (!document.fullscreenElement && root.requestFullscreen) {
       void root.requestFullscreen()
         .then(async () => {
           try { await orientation?.lock?.('landscape'); } catch {}
           syncLayout();
         })
-        .catch(() => {
-          // CSS immersive mode remains active when the Fullscreen API is denied.
-        });
+        .catch(() => {});
+    } else if (!document.fullscreenElement && element.webkitRequestFullscreen) {
+      try {
+        element.webkitRequestFullscreen();
+        try { void orientation?.lock?.('landscape'); } catch {}
+      } catch {}
+    } else {
+      try { void orientation?.lock?.('landscape'); } catch {}
     }
   }, [setImmersiveMode, syncLayout]);
 
