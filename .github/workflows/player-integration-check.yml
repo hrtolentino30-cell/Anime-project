@@ -10,9 +10,9 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  build-and-player-qa:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,3 +20,23 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Start isolated preview server
+        run: |
+          VERCEL_ENV=preview npm start -- -H 127.0.0.1 > /tmp/animori-next.log 2>&1 &
+          echo $! > /tmp/animori-next.pid
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:3000/player-qa?case=mp4 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/animori-next.log
+          exit 1
+      - name: Run player browser QA
+        run: node scripts/player-qa.mjs
+        env:
+          QA_BASE_URL: http://127.0.0.1:3000
+      - name: Show preview server log
+        if: always()
+        run: cat /tmp/animori-next.log || true
