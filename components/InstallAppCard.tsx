@@ -42,7 +42,7 @@ export function InstallAppCard() {
     setPromptEvent(null);
   }
 
-  return <section className="installCard" aria-labelledby="install-animori-title">
+  return <section className="accountCard installCard" aria-labelledby="install-animori-title">
     <div className="installCardHead">
       <div>
         <span className="eyebrow">MOBILE APP</span>
