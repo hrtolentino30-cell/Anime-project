@@ -36,21 +36,24 @@ jobs:
     outputs:
       matrix: ${{ steps.slots.outputs.matrix }}
       has_work: ${{ steps.available.outputs.has_work }}
+      pending_count: ${{ steps.available.outputs.pending_count }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - id: slots
-        name: Select workers for Philippine peak hours
-        env:
-          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
-        run: echo "matrix=$(node scripts/facebook-worker-slots.mjs)" >> "$GITHUB_OUTPUT"
       - id: available
         name: Check queue before heavy worker setup
         env:
+          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
           FACEBOOK_UPLOAD_PROXY_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-upload-proxy
         run: node scripts/facebook-work-available.mjs
+      - id: slots
+        name: Scale workers to current backlog
+        env:
+          ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
+          FACEBOOK_PENDING_COUNT: ${{ steps.available.outputs.pending_count }}
+        run: echo "matrix=$(node scripts/facebook-worker-slots.mjs)" >> "$GITHUB_OUTPUT"
 
   probe:
     needs: capacity
