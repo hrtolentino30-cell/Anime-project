@@ -13,11 +13,9 @@ function errorMessage(error:unknown){
 }
 
 function capacity(backlog:number){
-  if(backlog>=1500)return{limit:16,concurrency:3};
-  if(backlog>=500)return{limit:14,concurrency:3};
-  if(backlog>=100)return{limit:12,concurrency:2};
-  if(backlog>=25)return{limit:10,concurrency:2};
-  return{limit:8,concurrency:1};
+  // Supabase Free stays stable with the proven 8-job sequential batch.
+  // Throughput comes from a 30-second cron cadence, not heavier single invocations.
+  return{limit:Math.max(1,Math.min(8,backlog||1)),concurrency:1};
 }
 
 Deno.serve(async req=>{
