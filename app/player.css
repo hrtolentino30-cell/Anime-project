@@ -5,3 +5,38 @@
 @media(max-width:520px) and (orientation:portrait){.bbp-title{right:8.5rem}.bbp-actions button:nth-child(2),.bbp-actions button:nth-child(4){display:none}.bbp-panel{inset:auto 0 0;width:100%;max-height:78%;border-radius:20px 20px 0 0;border-right:1px solid rgba(255,255,255,.12);border-bottom:0;box-shadow:0 -20px 65px rgba(0,0,0,.55)}.bbp-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 @media(orientation:landscape) and (max-height:560px){.animoriBbpHost{height:min(100dvh,100vw * .5625);max-height:100dvh;border-radius:0}.bbp-top{padding:max(.4rem,env(safe-area-inset-top)) .6rem 0}.bbp-circle{width:38px;height:38px}.bbp-title{left:max(.7rem,env(safe-area-inset-left));right:18rem;bottom:max(3.8rem,calc(env(safe-area-inset-bottom) + 3.35rem))}.bbp-title h1{font-size:1rem}.bbp-actions{right:max(.6rem,env(safe-area-inset-right));bottom:max(2.85rem,calc(env(safe-area-inset-bottom) + 2.45rem))}.bbp-actions button{min-height:36px}.bbp-center button{width:42px;height:42px}.bbp-center .play{width:54px;height:54px}.bbp-progress{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom))}.bbp-panel{width:min(400px,52%);border-radius:18px 0 0 18px}}
 @media(prefers-reduced-motion:reduce){.bbp-chrome,.bbp-toast,.bbp-root{transition:none}.bbp-loading .spinner{animation-duration:1.3s}}
+
+body.animori-player-immersive{overflow:hidden!important;overscroll-behavior:none!important;background:#000!important}
+.animoriBbpHost-immersive{overflow:visible!important}
+.bbp-preplayVisual{position:absolute;inset:0;z-index:2;background:#080808 center/cover no-repeat;filter:saturate(.85) brightness(.58);transform:scale(1.015)}
+.bbp-preplayVisual:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.38))}
+.bbp-shade{z-index:3}
+.bbp-top{z-index:12;gap:.7rem;background:linear-gradient(180deg,rgba(0,0,0,.52),transparent);padding-bottom:2.7rem;pointer-events:none}
+.bbp-top>*{pointer-events:auto}
+.bbp-topMeta{min-width:0;flex:1;display:grid;gap:.12rem;padding:.2rem .3rem;text-shadow:0 2px 14px #000;cursor:pointer}
+.bbp-topMeta strong{font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bbp-topMeta span{font-size:.6rem;color:var(--bbp-muted);font-weight:750;letter-spacing:.04em}
+.bbp-topActions{display:flex;gap:.35rem;align-items:center}
+.bbp-quick-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.bbp-quick-actions button{min-height:44px;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:#171717;color:var(--bbp-fg);cursor:pointer;padding:8px 10px;font-weight:750}
+.bbp-react-panel{position:static;margin-top:10px;width:max-content;max-width:100%}
+.bbp-root.bbp-immersive{position:fixed;z-index:2147483000;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;border-radius:0;background:#000;touch-action:none;transform:none!important}
+.bbp-root.bbp-immersive .bbp-video,.bbp-root.bbp-immersive .bbp-embed{background:#000}
+.bbp-root.bbp-immersive .bbp-progress{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));bottom:max(10px,env(safe-area-inset-bottom))}
+.bbp-root.bbp-immersive .bbp-center{top:50%}
+.bbp-root.bbp-immersive .bbp-panel{max-height:100%}
+@media(orientation:portrait) and (max-width:900px){
+  .bbp-root.bbp-immersive{inset:auto;top:50%;left:50%;width:100dvh;height:100vw;transform:translate(-50%,-50%) rotate(90deg)!important;transform-origin:center center}
+  .bbp-root.bbp-immersive .bbp-top{padding:max(.45rem,env(safe-area-inset-right)) .65rem 2.35rem}
+  .bbp-root.bbp-immersive .bbp-progress{left:14px;right:14px;bottom:8px}
+  .bbp-root.bbp-immersive .bbp-panel{width:min(420px,58%)}
+}
+@media(max-height:520px) and (orientation:landscape){
+  .bbp-topMeta strong{font-size:.74rem}
+  .bbp-circle{width:36px;height:36px}
+  .bbp-center{gap:9px}
+  .bbp-center button{width:42px;height:42px}
+  .bbp-center .play{width:54px;height:54px}
+}
+
+.bbp-root:not(.bbp-immersive) .bbp-loading{background:rgba(9,9,9,.78);backdrop-filter:blur(8px)}
