@@ -279,13 +279,13 @@ export function Player({
   useEffect(() => {
     const originalOpen = window.open;
     const guardedOpen = ((url?: string | URL, target?: string, features?: string) => {
-      const activation = (navigator as Navigator & { userActivation?: { isActive?: boolean } }).userActivation;
+      const activation = (navigator as any).userActivation as { isActive?: boolean } | undefined;
       if (!activation?.isActive) {
         if (rootRef.current) rootRef.current.dataset.popupBlocked = 'true';
         emit('popup_blocked', source?.id);
         return null;
       }
-      return (originalOpen as (...args: unknown[]) => Window | null)(url, target, features);
+      return (originalOpen as any)(url as any, target, features);
     }) as typeof window.open;
     window.open = guardedOpen;
     return () => {
@@ -305,8 +305,8 @@ export function Player({
     let cancelled = false;
     const db = createSupabaseBrowserClient();
     void db.from('favorites').select('anime_id').eq('user_id', userId).eq('anime_id', animeId).maybeSingle()
-      .then(({ data, error }: {data: unknown; error: unknown}) => {
-        if (!cancelled && !error) setFavorite(Boolean(data));
+      .then((result) => {
+        if (!cancelled && !result.error) setFavorite(Boolean(result.data));
       });
     return () => { cancelled = true; };
   }, [animeId, qaMode, userId]);
@@ -795,18 +795,15 @@ export function Player({
     };
     const element = root as HTMLDivElement & { webkitRequestFullscreen?: () => void };
     const media = video as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
-    const orientation = screen.orientation as ScreenOrientation & {
-      lock?: (orientation: OrientationLockType) => Promise<void>;
-      unlock?: () => void;
-    };
+    const orientation = (screen as any).orientation as { lock?: (orientation: 'landscape') => Promise<void>; unlock?: () => void } | undefined;
     try {
       if (document.fullscreenElement || doc.webkitFullscreenElement) {
-        try { orientation.unlock?.(); } catch {}
+        try { orientation?.unlock?.(); } catch {}
         if (document.fullscreenElement) await document.exitFullscreen();
         else await doc.webkitExitFullscreen?.();
       } else if (root.requestFullscreen) {
-        await root.requestFullscreen({ navigationUI: 'hide' });
-        try { await orientation.lock?.('landscape'); } catch {}
+        await root.requestFullscreen();
+        try { await orientation?.lock?.('landscape'); } catch {}
       } else if (element.webkitRequestFullscreen) {
         element.webkitRequestFullscreen();
       } else {
