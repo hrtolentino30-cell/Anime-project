@@ -8,4 +8,5 @@ export type Anime = {
 export type VideoSource = {
   id: string; episode_id: string; server_name: string; source_type: 'embed'|'hls'|'mp4'|'other';
   embed_url?: string | null; stream_url?: string | null; quality?: string | null; language?: string | null; is_active: boolean;
+  verification_failures?: number | null; last_verified_at?: string | null; created_at?: string | null; updated_at?: string | null;
 };
