@@ -10,7 +10,13 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "*/10 * * * *"
+    # Peak: every 5 minutes from 21:00 through 01:59 PHT.
+    - cron: "*/5 13-17 * * *"
+    # 02:00 PHT boundary run.
+    - cron: "0 18 * * *"
+    # Off-peak: every 10 minutes.
+    - cron: "7,17,27,37,47,57 0-12,19-23 * * *"
+    - cron: "10,20,30,40,50 18 * * *"
 
 permissions:
   contents: read
@@ -24,8 +30,12 @@ jobs:
   capacity:
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    permissions:
+      contents: read
+      id-token: write
     outputs:
       matrix: ${{ steps.slots.outputs.matrix }}
+      has_work: ${{ steps.available.outputs.has_work }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,9 +46,15 @@ jobs:
         env:
           ANIMOTV_EPISODE_URL: ${{ inputs.episode_url }}
         run: echo "matrix=$(node scripts/facebook-worker-slots.mjs)" >> "$GITHUB_OUTPUT"
+      - id: available
+        name: Check queue before heavy worker setup
+        env:
+          FACEBOOK_UPLOAD_PROXY_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-upload-proxy
+        run: node scripts/facebook-work-available.mjs
 
   probe:
     needs: capacity
+    if: needs.capacity.outputs.has_work == 'true'
     strategy:
       fail-fast: false
       max-parallel: 2
