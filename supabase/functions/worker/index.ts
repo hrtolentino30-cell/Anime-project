@@ -25,7 +25,7 @@ Deno.serve(async req=>{
   try{provider=new UpstreamProvider(await getUpstreamBaseUrl(db))}
   catch(error){return Response.json({error:errorMessage(error)},{status:500})}
 
-  await db.rpc('recover_stale_sync_jobs',{p_age:'12 minutes'});
+  await db.rpc('recover_stale_sync_jobs',{p_age:'3 minutes'});
 
   const now=new Date().toISOString();
   const{count:backlog,error:backlogError}=await db.from('sync_queue').select('id',{count:'exact',head:true}).eq('status','pending').lte('available_at',now);
