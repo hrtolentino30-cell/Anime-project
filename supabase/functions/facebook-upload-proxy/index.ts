@@ -36,6 +36,14 @@ Deno.serve(async (req: Request) => {
   if (!PID || !PT) return Response.json({error:"Meta configuration missing"},{status:503});
   try {
     const url = new URL(req.url), phase = url.searchParams.get("phase");
+    if (phase === "available") {
+      const r = await fetch(`${SU}/rest/v1/facebook_episode_queue?status=eq.pending&select=episode_id&limit=1`, {
+        headers:{apikey:SK,authorization:`Bearer ${SK}`}
+      });
+      if (!r.ok) throw new Error("Queue availability lookup failed");
+      const rows = await r.json();
+      return Response.json({available:Array.isArray(rows) && rows.length > 0});
+    }
     if (phase === "next") return Response.json({job:await rpc("claim_facebook_upload",{p_episode_url:url.searchParams.get("episode_url") || null})});
     if (phase === "status") {
       const id = url.searchParams.get("video_id") || "";
