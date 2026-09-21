@@ -96,14 +96,15 @@ Deno.serve(async req=>{
     await db.from('video_sources').update({verification_failures:failures,last_verified_at:now,is_active:!inactive}).eq('id',source.id);
 
     const ep=source.episode;
-    if(ep?.source_url&&ep?.source_episode_id){
-      await db.rpc('enqueue_sync_job',{p_source_url:ep.source_url,p_source_id:ep.source_episode_id,p_item_type:'episode',p_priority:1});
+    const shouldResync=failures>=2&&!!ep?.source_url&&!!ep?.source_episode_id;
+    if(shouldResync){
+      await db.rpc('enqueue_sync_job',{p_source_url:ep!.source_url,p_source_id:ep!.source_episode_id,p_item_type:'episode',p_priority:1});
       resyncs++;
     }
     await logEvent(db,'VIDEO_SOURCE_FAILED',{
       entityId:source.id,
-      message:inactive?'Source disabled after repeated verification failures':'Source verification failed; episode queued for fast website repair',
-      details:{failures,resyncQueued:!!ep,sourceType:source.source_type}
+      message:inactive?'Source disabled after repeated verification failures':shouldResync?'Repeated source failure; episode queued for fast website repair':'Source verification failed; alternate mirrors remain eligible',
+      details:{failures,resyncQueued:shouldResync,sourceType:source.source_type}
     });
     if(inactive)disabled++;
   }
