@@ -1,53 +1,103 @@
-import { chromium } from "playwright";
-const endpoint=(process.env.ANIMEPAHE_DETECT_URL||"").trim(),secret=(process.env.MEDIA_BRIDGE_SECRET||"").replace(/[^\x20-\x7E]/g,"").trim();
-if(!endpoint||!secret)throw new Error("Detector configuration missing");
-const bases=["https://animepahe.com/","https://animepahe.pw/"];\nconst browser=await chromium.launch({headless:true});
-const page=await browser.newPage({viewport:{width:1280,height:900}});
-const forcedTitle=(process.env.ANIMEPAHE_FORCE_TITLE||"").trim();
-const forcedEpisode=Number(process.env.ANIMEPAHE_FORCE_EPISODE||0);
-let base=""; for(const b of bases){try{const rr=await page.goto(b,{waitUntil:"domcontentloaded",timeout:60000});await page.waitForTimeout(8000);console.log("ANIMEPAHE_DOMAIN="+b+" STATUS="+(rr?.status()||0));if(rr&&rr.status()<400){base=b;break}}catch(e){console.log("ANIMEPAHE_DOMAIN_ERROR="+b+" "+e.message)}} if(!base)throw new Error("No AnimePahe domain accepted this browser session");
+import { chromium } from 'playwright';
+
+const commitCandidates=/^(1|true|yes)$/i.test(process.env.ANIMEPAHE_COMMIT_CANDIDATES||'');
+const endpoint=(process.env.ANIMEPAHE_DETECT_URL||'').trim();
+const secret=(process.env.MEDIA_BRIDGE_SECRET||'').replace(/[^\x20-\x7E]/g,'').trim();
+if(commitCandidates&&(!endpoint||!secret))throw new Error('Live detector configuration missing');
+
+const bases=['https://animepahe.pw/','https://animepahe.com/'];
+const browser=await chromium.launch({headless:true});
+const context=await browser.newContext({
+  viewport:{width:1280,height:900},
+  locale:'en-US',
+  timezoneId:'Asia/Manila'
+});
+const page=await context.newPage();
+
+async function settle(url){
+  let response=null;
+  try{response=await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000})}catch(e){console.log('ANIMEPAHE_NAV_ERROR='+url+' '+e.message)}
+  await page.waitForTimeout(12000);
+  const state=await page.evaluate(()=>({
+    url:location.href,
+    title:document.title,
+    text:(document.body?.innerText||'').slice(0,500)
+  })).catch(()=>({url:page.url(),title:'',text:''}));
+  console.log('ANIMEPAHE_DOMAIN='+url+' STATUS='+(response?.status()||0)+' FINAL='+state.url+' TITLE='+JSON.stringify(state.title));
+  const challenged=/just a moment|checking your browser|verify you are human|attention required|access denied/i.test(state.title+' '+state.text);
+  return {accepted:!challenged&&/^https:\/\/animepahe\.(?:pw|com)\//i.test(state.url),challenged,state,status:response?.status()||0};
+}
+
+let base='';
+for(const candidate of bases){
+  const result=await settle(candidate);
+  if(result.accepted){base=new URL(result.state.url).origin+'/';break}
+  console.log('ANIMEPAHE_BLOCKED='+candidate+' challenged='+result.challenged);
+}
+if(!base){
+  console.log('ANIMEPAHE_RESULT=blocked_by_cloudflare');
+  console.log('ANIMEPAHE_DRY_RUN=true');
+  await browser.close();
+  process.exit(0);
+}
+
+async function pageFetch(path){
+  const result=await page.evaluate(async path=>{
+    const r=await fetch(path,{
+      credentials:'include',
+      headers:{accept:'application/json,text/plain,*/*','x-requested-with':'XMLHttpRequest'}
+    });
+    return {status:r.status,text:await r.text(),url:r.url};
+  },path);
+  let json=null;
+  try{json=JSON.parse(result.text)}catch{}
+  return {...result,json};
+}
+
+const airing=await pageFetch(new URL('api?m=airing&page=1',base).href);
+console.log('ANIMEPAHE_AIRING_STATUS='+airing.status);
+if(airing.status!==200||!airing.json)throw new Error('AnimePahe airing API unavailable inside accepted browser session');
+const rows=Array.isArray(airing.json.data)?airing.json.data:[];
+console.log('ANIMEPAHE_AIRING_COUNT='+rows.length);
+console.log('ANIMEPAHE_AIRING_KEYS='+JSON.stringify([...new Set(rows.flatMap(x=>Object.keys(x||{})))].slice(0,40)));
+
 const items=[];
 const seen=new Set();
-const add=(title,url,episode=null)=>{if(!title||!url)return;try{url=new URL(url,base).href}catch{return}if(!url.startsWith(base)||seen.has(url))return;seen.add(url);items.push({title:String(title).replace(/\s+/g," ").trim(),url,episode})};
-for(const x of await page.locator("a").evaluateAll(as=>as.map(a=>({title:(a.textContent||"").trim(),url:a.href}))))add(x.title,x.url);
-// Prefer the upstream airing feed: it exposes anime id + episode session directly.
-try {
-  const ar=await page.request.get(base+"api?m=airing&page=1",{headers:{referer:base}});
-  if(ar.ok()){
-    const aj=await ar.json().catch(()=>null);
-    for(const e of aj?.data||[]){
-      const ep=Number(e.episode), id=e.anime_id||e.id, es=e.session;
-      if(!ep||!id||!es)continue;
-      add((e.anime_title||e.title||"Anime")+" Episode "+ep,base+"play/"+id+"/"+es,ep);
-    }
-  }
-} catch {}
-const sessions=[...new Set(items.map(x=>x.url.match(/\/anime\/([^/?#]+)/)?.[1]).filter(Boolean))].slice(0,30);
-for(const session of sessions){
- const api=base+"api?m=release&id="+encodeURIComponent(session)+"&sort=episode_desc&page=1";
- const res=await page.request.get(api,{headers:{referer:base}}).catch(()=>null); if(!res||!res.ok())continue;
- const j=await res.json().catch(()=>null); for(const e of j?.data||[]){const ep=Number(e.episode);const es=e.session;if(!ep||!es)continue;const parent=items.find(x=>x.url.includes("/anime/"+session));add((parent?.title||"Anime")+" Episode "+ep,base+"play/"+session+"/"+es,ep)}
+function add(item){
+  if(!item?.title||!item?.url)return;
+  let url;try{url=new URL(item.url,base).href}catch{return}
+  if(!url.startsWith(base)||seen.has(url))return;
+  seen.add(url);
+  items.push({title:String(item.title).replace(/\s+/g,' ').trim(),url,episode:Number(item.episode)||null});
 }
-if(forcedTitle&&forcedEpisode){
-  try{
-    const q=new URL(base+"api"); q.searchParams.set("m","search"); q.searchParams.set("q",forcedTitle); q.searchParams.set("_",String(Date.now()));
-    const sr=await page.request.get(q.href,{headers:{referer:base}});
-    console.log("ANIMEPAHE_FORCE_SEARCH_STATUS="+sr.status());
-    if(sr.ok()){
-      const sj=await sr.json().catch(()=>null);
-      const hit=(sj?.data||[]).find(x=>String(x.title||"").toLowerCase().includes(forcedTitle.toLowerCase()))||(sj?.data||[])[0];
-      if(hit){
-        const rr=await page.request.get(base+"api?m=release&id="+encodeURIComponent(hit.session)+"&sort=episode_asc&page=1",{headers:{referer:base}});
-        const rj=await rr.json().catch(()=>null); const last=Number(rj?.last_page||1); let eps=[...(rj?.data||[])];
-        for(let p=2;p<=last;p++){const pr=await page.request.get(base+"api?m=release&id="+encodeURIComponent(hit.session)+"&sort=episode_asc&page="+p,{headers:{referer:base}});const pj=await pr.json().catch(()=>null);eps.push(...(pj?.data||[]))}
-        const ep=eps.find(x=>Number(x.episode)===forcedEpisode);
-        if(ep?.session)add(hit.title+" Episode "+forcedEpisode,base+"play/"+hit.session+"/"+ep.session,forcedEpisode);
-      }
-    }
-  }catch(e){console.log("ANIMEPAHE_FORCE_ERROR="+e.message)}
+for(const e of rows){
+  const episode=Number(e.episode);
+  const animeSession=e.anime_session||e.anime_session_id||e.anime_id||e.session_id;
+  const episodeSession=e.session||e.episode_session;
+  const title=e.anime_title||e.title||e.anime?.title||'Anime';
+  if(episode&&animeSession&&episodeSession)add({title:title+' Episode '+episode,url:`play/${animeSession}/${episodeSession}`,episode});
 }
-console.log("ANIMEPAHE_DISCOVERED="+items.length);
-const r=await fetch(endpoint,{method:"POST",headers:{"content-type":"application/json","x-media-bridge-secret":secret},body:JSON.stringify({items:items.slice(0,100)})});
-console.log("ANIMEPAHE_DETECT_STATUS="+r.status);console.log("ANIMEPAHE_DETECT_RESPONSE="+(await r.text()).slice(0,8000));if(!r.ok)process.exitCode=1;
+
+const anchors=await page.locator('a[href]').evaluateAll(as=>as.map(a=>({title:(a.textContent||'').trim(),url:a.href})).filter(x=>x.title&&x.url));
+for(const a of anchors){
+  if(/\/play\//i.test(a.url))add({title:a.title,url:a.url});
+}
+
+console.log('ANIMEPAHE_DISCOVERED='+items.length);
+console.log('ANIMEPAHE_SAMPLE='+JSON.stringify(items.slice(0,10)));
+
+if(commitCandidates){
+  const r=await fetch(endpoint,{
+    method:'POST',
+    headers:{'content-type':'application/json','x-media-bridge-secret':secret},
+    body:JSON.stringify({items:items.slice(0,100)})
+  });
+  const body=await r.text();
+  console.log('ANIMEPAHE_DETECT_STATUS='+r.status);
+  console.log('ANIMEPAHE_DETECT_RESPONSE='+body.slice(0,4000));
+  if(!r.ok)process.exitCode=1;
+}else{
+  console.log('ANIMEPAHE_DRY_RUN=true');
+}
+
 await browser.close();
-// Link Click S3E7 controlled validation

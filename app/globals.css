@@ -30,7 +30,7 @@
 }
 
 /* Account install + support */
-.navActions a.navSupport{width:auto;min-width:39px;padding:0 12px;grid-auto-flow:column;gap:7px;color:#f0d6d8;border-color:#583237;background:#190f12}
+.navActions a.navSupport{width:auto;min-width:max-content;padding:0 13px;display:inline-flex;align-items:center;justify-content:center;gap:0;color:#f0d6d8;border-color:#583237;background:#190f12;font-size:12px;font-weight:800;letter-spacing:.02em}
 .navActions a.navSupport:hover{border-color:#85515a;background:#211216;color:#fff}
 .installAppCard{margin-top:18px;display:grid;grid-template-columns:auto 1fr;gap:18px;padding:22px;border:1px solid #252f40;border-radius:19px;background:linear-gradient(135deg,#0f1219,#120d12);box-shadow:0 20px 55px #0004}
 .installAppIcon{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;background:#21151a;border:1px solid #5a3239;color:#f0d6d8}
@@ -54,8 +54,10 @@
 .supportNote svg{color:#d47f87}
 @media(max-width:900px){.supportGrid{grid-template-columns:1fr}}
 @media(max-width:720px){
-  .navActions a.navSupport{width:34px;padding:0}
-  .navSupport span{display:none}
+  .navActions>a:not(.navSupport):not(.navAccount){display:none}
+  .navActions a.navSupport{width:auto;min-width:72px;padding:0 11px;font-size:11px}
+  .navActions a.navAccount{display:grid}
+
   .installAppCard{grid-template-columns:1fr;gap:12px;padding:18px}
   .installAppIcon{width:46px;height:46px}
   .installAppBody h2{font-size:20px}

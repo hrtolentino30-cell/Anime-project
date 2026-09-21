@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Bookmark, Compass, Heart, History, Home, Search, UserRound } from 'lucide-react';
+import { Bookmark, Compass, History, Home, Search, UserRound } from 'lucide-react';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { NavLink } from './NavLink';
 import { Brand } from './Brand';
@@ -23,7 +23,7 @@ export async function Navbar() {
       <div className="navActions">
         <NavLink href="/search" className="navSearchLink" label="Search"><Search size={19} /></NavLink>
         {user && <><NavLink href="/my-list" label="My List"><Bookmark size={19} /></NavLink><NavLink href="/history" label="History"><History size={19} /></NavLink></>}
-        <NavLink href="/support" className="navSupport" label="Support"><Heart size={18} /><span>Support</span></NavLink>
+        <a href="https://storefront.paymongo.com/support-animori" className="navSupport" target="_blank" rel="noopener noreferrer" aria-label="Support Animori">Support</a>
         <NavLink href={user ? '/account' : '/login'} className="navAccount" label={user ? 'Account' : 'Sign in'}><UserRound size={18} /><span>{user ? 'Account' : 'Sign in'}</span></NavLink>
       </div>
     </header>
@@ -32,6 +32,7 @@ export async function Navbar() {
       <NavLink href="/browse" className="mobileNavItem"><Compass aria-hidden="true" /><span>Browse</span></NavLink>
       <NavLink href="/search" className="mobileNavItem"><Search aria-hidden="true" /><span>Search</span></NavLink>
       {user && <NavLink href="/my-list" className="mobileNavItem"><Bookmark aria-hidden="true" /><span>My List</span></NavLink>}
+      <a href="https://storefront.paymongo.com/support-animori" className="mobileNavItem mobileSupport" target="_blank" rel="noopener noreferrer">Support</a>
       <NavLink href={user ? '/account' : '/login'} className="mobileNavItem"><UserRound aria-hidden="true" /><span>{user ? 'Account' : 'Sign in'}</span></NavLink>
     </nav>
   </>;
