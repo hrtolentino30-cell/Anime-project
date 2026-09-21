@@ -6,7 +6,7 @@
 @media(orientation:landscape) and (max-height:560px){.animoriBbpHost{height:min(100dvh,100vw * .5625);max-height:100dvh;border-radius:0}.bbp-top{padding:max(.4rem,env(safe-area-inset-top)) .6rem 0}.bbp-circle{width:38px;height:38px}.bbp-title{left:max(.7rem,env(safe-area-inset-left));right:18rem;bottom:max(3.8rem,calc(env(safe-area-inset-bottom) + 3.35rem))}.bbp-title h1{font-size:1rem}.bbp-actions{right:max(.6rem,env(safe-area-inset-right));bottom:max(2.85rem,calc(env(safe-area-inset-bottom) + 2.45rem))}.bbp-actions button{min-height:36px}.bbp-center button{width:42px;height:42px}.bbp-center .play{width:54px;height:54px}.bbp-progress{left:max(12px,env(safe-area-inset-left));right:max(12px,env(safe-area-inset-right));bottom:max(8px,env(safe-area-inset-bottom))}.bbp-panel{width:min(400px,52%);border-radius:18px 0 0 18px}}
 @media(prefers-reduced-motion:reduce){.bbp-chrome,.bbp-toast,.bbp-root{transition:none}.bbp-loading .spinner{animation-duration:1.3s}}
 
-body.animori-player-immersive{overflow:hidden!important;overscroll-behavior:none!important}
+body.animori-player-immersive{overflow:hidden!important;overscroll-behavior:none!important;background:#000!important}
 .animoriBbpHost-immersive{overflow:visible!important}
 .bbp-preplayVisual{position:absolute;inset:0;z-index:2;background:#080808 center/cover no-repeat;filter:saturate(.85) brightness(.58);transform:scale(1.015)}
 .bbp-preplayVisual:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.38))}
@@ -38,3 +38,5 @@ body.animori-player-immersive{overflow:hidden!important;overscroll-behavior:none
   .bbp-center button{width:42px;height:42px}
   .bbp-center .play{width:54px;height:54px}
 }
+
+.bbp-root:not(.bbp-immersive) .bbp-loading{background:rgba(9,9,9,.78);backdrop-filter:blur(8px)}
