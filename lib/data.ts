@@ -48,7 +48,7 @@ const getCachedAnimeBySlug=unstable_cache(async(slug:string)=>{
 
 export async function getAnimeBySlug(slug:string){return getCachedAnimeBySlug(slug)}
 
-function orderVideoSources<T extends {source_type?:string|null;server_name?:string|null;embed_url?:string|null;stream_url?:string|null;verification_failures?:number|null;last_verified_at?:string|null;created_at?:string|null}>(sources:T[]){
+function orderVideoSources<T extends {source_type?:string|null;server_name?:string|null;language?:string|null;embed_url?:string|null;stream_url?:string|null;verification_failures?:number|null;last_verified_at?:string|null;created_at?:string|null}>(sources:T[]){
   const typeRank=(source:T)=>source.source_type==='hls'?0:source.source_type==='mp4'?10:20;
   const hostRank=(source:T)=>{
     const raw=source.stream_url??source.embed_url??'';
@@ -68,9 +68,16 @@ function orderVideoSources<T extends {source_type?:string|null;server_name?:stri
     const verified=source.last_verified_at?Date.parse(source.last_verified_at):NaN;
     return Number.isFinite(verified)&&Date.now()-verified<=12*60*60*1000?0:10;
   };
+  const languageRank=(source:T)=>{
+    const language=(source.language??source.server_name??'').toLowerCase();
+    if(/soft\s*sub/.test(language))return 1;
+    if(/\bsub\b/.test(language))return 0;
+    if(/dub/.test(language))return 4;
+    return 2;
+  };
   return [...sources].sort((a,b)=>{
-    const scoreA=typeRank(a)+hostRank(a)+healthRank(a);
-    const scoreB=typeRank(b)+hostRank(b)+healthRank(b);
+    const scoreA=typeRank(a)+hostRank(a)+healthRank(a)+languageRank(a);
+    const scoreB=typeRank(b)+hostRank(b)+healthRank(b)+languageRank(b);
     if(scoreA!==scoreB)return scoreA-scoreB;
     return String(b.last_verified_at??b.created_at??'').localeCompare(String(a.last_verified_at??a.created_at??''));
   });
