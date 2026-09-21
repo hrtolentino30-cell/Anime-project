@@ -32,6 +32,7 @@ export async function Navbar() {
       <NavLink href="/browse" className="mobileNavItem"><Compass aria-hidden="true" /><span>Browse</span></NavLink>
       <NavLink href="/search" className="mobileNavItem"><Search aria-hidden="true" /><span>Search</span></NavLink>
       {user && <NavLink href="/my-list" className="mobileNavItem"><Bookmark aria-hidden="true" /><span>My List</span></NavLink>}
+      <a href="https://storefront.paymongo.com/support-animori" className="mobileNavItem mobileSupport" target="_blank" rel="noopener noreferrer">Support</a>
       <NavLink href={user ? '/account' : '/login'} className="mobileNavItem"><UserRound aria-hidden="true" /><span>{user ? 'Account' : 'Sign in'}</span></NavLink>
     </nav>
   </>;
