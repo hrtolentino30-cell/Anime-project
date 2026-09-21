@@ -54,7 +54,9 @@
 .supportNote svg{color:#d47f87}
 @media(max-width:900px){.supportGrid{grid-template-columns:1fr}}
 @media(max-width:720px){
+  .navActions>a:not(.navSupport):not(.navAccount){display:none}
   .navActions a.navSupport{width:auto;min-width:72px;padding:0 11px;font-size:11px}
+  .navActions a.navAccount{display:grid}
 
   .installAppCard{grid-template-columns:1fr;gap:12px;padding:18px}
   .installAppIcon{width:46px;height:46px}
