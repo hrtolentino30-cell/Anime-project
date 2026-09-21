@@ -11,15 +11,16 @@ function createPublicCatalogClient(){
 
 const getCachedHomeCatalog=unstable_cache(async()=>{
   const db=createPublicCatalogClient();
-  const [updated,latest,seasonal,movies,completed]=await Promise.all([
+  const [updated,latest,seasonal,movies,completed,highlyRated]=await Promise.all([
     db.from('anime').select(HOME_ANIME_FIELDS).order('updated_at',{ascending:false}).limit(24),
     db.from('episodes').select('id,episode_number,title,air_date,anime:anime_id(id,slug,title,poster_url,type)').order('created_at',{ascending:false}).limit(16),
     db.from('anime').select(HOME_ANIME_FIELDS).ilike('status','%ongoing%').order('updated_at',{ascending:false}).limit(12),
     db.from('anime').select(HOME_ANIME_FIELDS).ilike('type','%movie%').order('updated_at',{ascending:false}).limit(12),
     db.from('anime').select(HOME_ANIME_FIELDS).ilike('status','%complete%').order('updated_at',{ascending:false}).limit(12),
+    db.from('anime').select(HOME_ANIME_FIELDS).gt('rating',0).order('rating',{ascending:false}).order('year',{ascending:false}).limit(12),
   ]);
-  return {updatedAnime:updated.data??[],latestEpisodes:latest.data??[],seasonal:seasonal.data??[],movies:movies.data??[],completed:completed.data??[]};
-},['animori-public-home-v2'],{revalidate:120});
+  return {updatedAnime:updated.data??[],latestEpisodes:latest.data??[],seasonal:seasonal.data??[],movies:movies.data??[],completed:completed.data??[],highlyRated:highlyRated.data??[]};
+},['animori-public-home-v3'],{revalidate:120});
 
 async function getContinueWatching(){
   const db=await createSupabaseServerClient();
