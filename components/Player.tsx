@@ -305,7 +305,7 @@ export function Player({
     let cancelled = false;
     const db = createSupabaseBrowserClient();
     void db.from('favorites').select('anime_id').eq('user_id', userId).eq('anime_id', animeId).maybeSingle()
-      .then((result) => {
+      .then((result: { data: unknown; error: unknown }) => {
         if (!cancelled && !result.error) setFavorite(Boolean(result.data));
       });
     return () => { cancelled = true; };
