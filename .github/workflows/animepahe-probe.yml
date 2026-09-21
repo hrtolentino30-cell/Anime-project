@@ -28,6 +28,5 @@ jobs:
         env:
           ANIMEPAHE_DETECT_URL: https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-animepahe-detect
           MEDIA_BRIDGE_SECRET: ${{ secrets.MEDIA_BRIDGE_SECRET }}
-          ANIMEPAHE_FORCE_TITLE: Link Click Season 3
-          ANIMEPAHE_FORCE_EPISODE: '7'
+          ANIMEPAHE_COMMIT_CANDIDATES: 'false'
         run: node scripts/animepahe-probe.mjs
