@@ -201,14 +201,6 @@ Deno.serve(async req=>{
   if(integrityError)console.error('catalog integrity enqueue failed',integrityError.message);
   const integrityQueued=Number((integrity as any)?.queued??0);
 
-  if(repairs||integrityQueued){
-    const secret=Deno.env.get('SYNC_CRON_SECRET');
-    const url=Deno.env.get('SUPABASE_URL');
-    if(secret&&url){
-      fetch(url+'/functions/v1/worker',{method:'POST',headers:{'x-cron-secret':secret},body:'{}'}).catch(e=>console.error('immediate worker kick failed',e));
-    }
-  }
-
   return Response.json({
     ok:true,
     checked:episodes.length,
