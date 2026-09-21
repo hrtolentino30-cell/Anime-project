@@ -1,1 +1,95 @@
-import{requireCronSecret,serviceClient,logEvent,getUpstreamBaseUrl}from'../_shared/db.ts';import{UpstreamProvider}from'../_shared/sources/upstream/index.ts';import{ingestAnime,ingestEpisode}from'../_shared/ingest.ts';function errorMessage(error:unknown){if(error instanceof Error)return error.stack??error.message;if(error&&typeof error==='object'){const value=error as Record<string,unknown>,parts=[value.message,value.details,value.hint,value.code].filter((part):part is string=>typeof part==='string'&&part.length>0);if(parts.length)return parts.join(' | ');try{return JSON.stringify(error)}catch{}}return String(error)}Deno.serve(async req=>{try{await requireCronSecret(req)}catch(response){return response as Response}const db=serviceClient();let provider:UpstreamProvider;try{provider=new UpstreamProvider(await getUpstreamBaseUrl(db))}catch(error){return Response.json({error:errorMessage(error)},{status:500})}await db.rpc('recover_stale_sync_jobs',{p_age:'15 minutes'});const{data:run,error:runError}=await db.from('sync_runs').insert({run_type:'worker'}).select('id').single();if(runError)return Response.json({error:runError.message},{status:500});const{data:jobs,error}=await db.rpc('claim_sync_jobs',{p_limit:8});if(error)return Response.json({error:error.message},{status:500});const stats={new_anime:0,new_episodes:0,updated_anime:0,updated_episodes:0,errors:0};for(const job of jobs??[]){try{const result=job.item_type==='anime'?await ingestAnime(db,provider,job.source_url,run.id):await ingestEpisode(db,provider,job.source_url,run.id);if(job.item_type==='anime'){if(result.isNew)stats.new_anime++;else if(result.changed)stats.updated_anime++}else{if(result.isNew)stats.new_episodes++;else if(result.changed)stats.updated_episodes++}await db.from('sync_queue').update({status:'completed',completed_at:new Date().toISOString(),last_error:null}).eq('id',job.id)}catch(err){stats.errors++;const message=errorMessage(err),terminal=job.attempts>=job.max_attempts,backoffSeconds=Math.min(3600,30*2**Math.max(0,job.attempts-1));await db.from('sync_queue').update({status:terminal?'failed':'pending',started_at:null,completed_at:terminal?new Date().toISOString():null,available_at:new Date(Date.now()+backoffSeconds*1000).toISOString(),last_error:message.slice(0,12000)}).eq('id',job.id);await logEvent(db,terminal?'SCRAPE_FAILED':'QUEUE_RETRY',{runId:run.id,sourceUrl:job.source_url,message,details:{attempts:job.attempts,maxAttempts:job.max_attempts,backoffSeconds}})}}await db.from('sync_runs').update({finished_at:new Date().toISOString(),items_scanned:(jobs??[]).length,...stats}).eq('id',run.id);return Response.json({ok:true,runId:run.id,processed:(jobs??[]).length,...stats})})
+import{requireCronSecret,serviceClient,logEvent,getUpstreamBaseUrl}from'../_shared/db.ts';
+import{UpstreamProvider}from'../_shared/sources/upstream/index.ts';
+import{ingestAnime,ingestEpisode}from'../_shared/ingest.ts';
+
+function errorMessage(error:unknown){
+  if(error instanceof Error)return error.stack??error.message;
+  if(error&&typeof error==='object'){
+    const value=error as Record<string,unknown>,parts=[value.message,value.details,value.hint,value.code].filter((part):part is string=>typeof part==='string'&&part.length>0);
+    if(parts.length)return parts.join(' | ');
+    try{return JSON.stringify(error)}catch{}
+  }
+  return String(error)
+}
+
+function capacity(backlog:number){
+  if(backlog>=1500)return{limit:16,concurrency:3};
+  if(backlog>=500)return{limit:14,concurrency:3};
+  if(backlog>=100)return{limit:12,concurrency:2};
+  if(backlog>=25)return{limit:10,concurrency:2};
+  return{limit:8,concurrency:1};
+}
+
+Deno.serve(async req=>{
+  try{await requireCronSecret(req)}catch(response){return response as Response}
+  const db=serviceClient();
+  let provider:UpstreamProvider;
+  try{provider=new UpstreamProvider(await getUpstreamBaseUrl(db))}
+  catch(error){return Response.json({error:errorMessage(error)},{status:500})}
+
+  await db.rpc('recover_stale_sync_jobs',{p_age:'12 minutes'});
+
+  const now=new Date().toISOString();
+  const{count:backlog,error:backlogError}=await db.from('sync_queue').select('id',{count:'exact',head:true}).eq('status','pending').lte('available_at',now);
+  if(backlogError)return Response.json({error:backlogError.message},{status:500});
+  const pending=Math.max(0,Number(backlog??0));
+  const mode=capacity(pending);
+
+  const{data:run,error:runError}=await db.from('sync_runs').insert({run_type:'worker',details:{backlog:pending,batch_limit:mode.limit,concurrency:mode.concurrency}}).select('id').single();
+  if(runError)return Response.json({error:runError.message},{status:500});
+
+  const{data:jobs,error}=await db.rpc('claim_sync_jobs',{p_limit:mode.limit});
+  if(error)return Response.json({error:error.message},{status:500});
+
+  const list=jobs??[];
+  const stats={new_anime:0,new_episodes:0,updated_anime:0,updated_episodes:0,errors:0};
+  let cursor=0;
+
+  async function processJob(job:any){
+    try{
+      const result=job.item_type==='anime'
+        ?await ingestAnime(db,provider,job.source_url,run.id)
+        :await ingestEpisode(db,provider,job.source_url,run.id);
+      if(job.item_type==='anime'){
+        if(result.isNew)stats.new_anime++;
+        else if(result.changed)stats.updated_anime++;
+      }else{
+        if(result.isNew)stats.new_episodes++;
+        else if(result.changed)stats.updated_episodes++;
+      }
+      await db.from('sync_queue').update({status:'completed',completed_at:new Date().toISOString(),last_error:null}).eq('id',job.id);
+    }catch(err){
+      stats.errors++;
+      const message=errorMessage(err),terminal=job.attempts>=job.max_attempts,backoffSeconds=Math.min(1800,20*2**Math.max(0,job.attempts-1));
+      await db.from('sync_queue').update({
+        status:terminal?'failed':'pending',
+        started_at:null,
+        completed_at:terminal?new Date().toISOString():null,
+        available_at:new Date(Date.now()+backoffSeconds*1000).toISOString(),
+        last_error:message.slice(0,12000)
+      }).eq('id',job.id);
+      await logEvent(db,terminal?'SCRAPE_FAILED':'QUEUE_RETRY',{
+        runId:run.id,sourceUrl:job.source_url,message,
+        details:{attempts:job.attempts,maxAttempts:job.max_attempts,backoffSeconds}
+      });
+    }
+  }
+
+  await Promise.all(Array.from({length:Math.min(mode.concurrency,list.length)},async()=>{
+    while(true){
+      const index=cursor++;
+      if(index>=list.length)break;
+      await processJob(list[index]);
+    }
+  }));
+
+  const{count:remaining}=await db.from('sync_queue').select('id',{count:'exact',head:true}).eq('status','pending').lte('available_at',new Date().toISOString());
+  await db.from('sync_runs').update({
+    finished_at:new Date().toISOString(),
+    items_scanned:list.length,
+    ...stats,
+    details:{backlog_before:pending,backlog_after:Number(remaining??0),batch_limit:mode.limit,concurrency:mode.concurrency}
+  }).eq('id',run.id);
+
+  return Response.json({ok:true,runId:run.id,processed:list.length,backlogBefore:pending,backlogAfter:Number(remaining??0),batchLimit:mode.limit,concurrency:mode.concurrency,...stats})
+});
