@@ -101,6 +101,7 @@ export function Player({
   const triedFailoverRef = useRef(new Set<string>());
   const milestonesRef = useRef(new Set<number>());
   const historyRecordedRef = useRef(false);
+  const playbackStartedRef = useRef(false);
 
   const portableSources = useMemo(() => adaptAnimoriSources(sources), [sources]);
   const [selectedSourceId, setSelectedSourceId] = useState(portableSources[0]?.id ?? '');
@@ -108,7 +109,8 @@ export function Player({
   const [loading, setLoading] = useState(Boolean(portableSources.length));
   const [failure, setFailure] = useState('');
   const [notice, setNotice] = useState('');
-  const [controlsVisible, setControlsVisible] = useState(true);
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const [playbackStarted, setPlaybackStarted] = useState(false);
   const [panel, setPanel] = useState<Panel>(null);
   const [reactionOpen, setReactionOpen] = useState(false);
   const [autoplayCancelled, setAutoplayCancelled] = useState(false);
@@ -401,7 +403,7 @@ export function Player({
       const autoplay = shouldAutoplayRef.current;
       shouldAutoplayRef.current = false;
       if (autoplay) void video.play().catch(() => {});
-      showControls();
+      if (playbackStartedRef.current) showControls();
     };
 
     const onError = () => {
@@ -491,6 +493,39 @@ export function Player({
     root.classList.toggle('bbp-device-landscape', Boolean(deviceLandscape));
   }, [embedMode]);
 
+  const enterLandscapeFullscreen = useCallback(() => {
+    const root = rootRef.current;
+    const video = videoRef.current;
+    if (!root) return;
+
+    const doc = document as Document & { webkitFullscreenElement?: Element | null };
+    if (document.fullscreenElement || doc.webkitFullscreenElement) return;
+
+    const element = root as HTMLDivElement & { webkitRequestFullscreen?: () => void };
+    const media = video as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    const orientation = (screen as any).orientation as { lock?: (orientation: 'landscape') => Promise<void> } | undefined;
+
+    try {
+      if (root.requestFullscreen) {
+        const request = root.requestFullscreen();
+        void request.then(async () => {
+          try { await orientation?.lock?.('landscape'); } catch {}
+          syncLayout();
+        }).catch(() => {
+          try { media?.webkitEnterFullscreen?.(); } catch {}
+        });
+      } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+        try { void orientation?.lock?.('landscape'); } catch {}
+        syncLayout();
+      } else {
+        media?.webkitEnterFullscreen?.();
+      }
+    } catch {
+      try { media?.webkitEnterFullscreen?.(); } catch {}
+    }
+  }, [syncLayout]);
+
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -519,6 +554,8 @@ export function Player({
       }
     };
     const onPlay = () => {
+      playbackStartedRef.current = true;
+      setPlaybackStarted(true);
       emit('play', source?.id);
       showControls();
     };
@@ -801,20 +838,31 @@ export function Player({
         try { orientation?.unlock?.(); } catch {}
         if (document.fullscreenElement) await document.exitFullscreen();
         else await doc.webkitExitFullscreen?.();
-      } else if (root.requestFullscreen) {
-        await root.requestFullscreen();
-        try { await orientation?.lock?.('landscape'); } catch {}
-      } else if (element.webkitRequestFullscreen) {
-        element.webkitRequestFullscreen();
       } else {
-        media?.webkitEnterFullscreen?.();
+        enterLandscapeFullscreen();
       }
     } catch {
       try { media?.webkitEnterFullscreen?.(); } catch {}
     }
     syncLayout();
     showControls();
-  }, [showControls, syncLayout]);
+  }, [enterLandscapeFullscreen, showControls, syncLayout]);
+
+  const startPlayback = useCallback(() => {
+    playbackStartedRef.current = true;
+    setPlaybackStarted(true);
+    setPanel(null);
+    enterLandscapeFullscreen();
+    showControls();
+    if (embedMode) return;
+    const video = videoRef.current;
+    if (!video) return;
+    void video.play().catch(() => {
+      playbackStartedRef.current = false;
+      setPlaybackStarted(false);
+      setControlsVisible(false);
+    });
+  }, [embedMode, enterLandscapeFullscreen, showControls]);
 
   const seekBy = useCallback((delta: number) => {
     if (embedMode || !videoRef.current) {
@@ -922,7 +970,7 @@ export function Player({
       ref={rootRef}
       className={`bbp-root ${controlsVisible ? 'bbp-controls' : ''}`}
       onPointerDown={beginHold}
-      onPointerMove={() => showControls()}
+      onPointerMove={() => { if (playbackStartedRef.current) showControls(); }}
       onWheel={onWheel}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -959,7 +1007,6 @@ export function Player({
           setLoading(false);
           setFailure('');
           emit('play_start', source.id);
-          showControls(true);
         }}
         onError={() => {
           if (embedMode) failActiveSource('This embedded player failed to load.', true);
@@ -984,12 +1031,12 @@ export function Player({
 
       {holding2x && <div className="bbp-speed">▶▶ <strong>2x</strong></div>}
 
-      <div className="bbp-top bbp-chrome">
+      {playbackStarted && <div className="bbp-top bbp-chrome">
         <button className="bbp-circle" type="button" onClick={() => void closeToAnime()} aria-label="Back to anime">×</button>
         <button className="bbp-circle" type="button" onClick={() => { setPanel('more'); showControls(true); }} aria-label="More options">•••</button>
-      </div>
+      </div>}
 
-      <section
+      {playbackStarted && <section
         className="bbp-title bbp-chrome"
         role="button"
         tabIndex={0}
@@ -1005,23 +1052,28 @@ export function Player({
         <div className="kicker"><span>EP {String(episodeNumber).padStart(2, '0')}</span><span>{episodeIndex + 1} / {siblings.length}</span></div>
         <h1>{animeTitle}</h1>
         <p>{episodeTitle || `Episode ${episodeNumber}`}</p>
-      </section>
+      </section>}
 
-      <aside className="bbp-actions bbp-chrome">
+      {playbackStarted && <aside className="bbp-actions bbp-chrome">
         <button type="button" onClick={() => { setPanel('episodes'); showControls(true); }}><b>☷</b><small>Episodes</small></button>
         <button type="button" disabled={favoriteBusy} onClick={() => void toggleFavorite()}><b>{favorite ? '✓' : '＋'}</b><small>My List</small></button>
         <button type="button" onClick={() => { setReactionOpen((value) => !value); showControls(true); }} aria-expanded={reactionOpen}><b>☺</b><small>React</small></button>
         <button type="button" onClick={() => void share()}><b>↗</b><small>Share</small></button>
-      </aside>
+      </aside>}
 
-      {reactionOpen && <div className="bbp-react">
+      {playbackStarted && reactionOpen && <div className="bbp-react">
         <button type="button" onClick={() => void sendReaction('heart')} aria-label="Love">❤️</button>
         <button type="button" onClick={() => void sendReaction('shock')} aria-label="Shocked">😱</button>
         <button type="button" onClick={() => void sendReaction('laugh')} aria-label="Funny">😂</button>
         <button type="button" onClick={() => void sendReaction('fire')} aria-label="Fire">🔥</button>
       </div>}
 
-      {!embedMode && <div className="bbp-center bbp-chrome">
+      {!loading && !failure && !playbackStarted && <div className="bbp-start">
+        <button type="button" onClick={() => startPlayback()} aria-label="Play in landscape fullscreen">▶</button>
+        <span>{embedMode ? 'Open player' : 'Play'}</span>
+      </div>}
+
+      {!embedMode && playbackStarted && <div className="bbp-center bbp-chrome">
         <button type="button" onClick={() => seekBy(-5)} aria-label="Back 5 seconds">−5</button>
         <button className="play" type="button" onClick={() => {
           const video = videoRef.current;
@@ -1031,7 +1083,7 @@ export function Player({
         <button type="button" onClick={() => seekBy(5)} aria-label="Forward 5 seconds">+5</button>
       </div>}
 
-      {!embedMode && <div className="bbp-progress bbp-chrome">
+      {!embedMode && playbackStarted && <div className="bbp-progress bbp-chrome">
         <span>{formatTime(shownCurrent)}</span>
         <input
           type="range"
