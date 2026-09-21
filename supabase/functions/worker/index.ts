@@ -16,13 +16,25 @@ function capacity(backlog:number,urgentRepairs:number){
   // Older repair pages can resolve many dynamic mirrors and are heavier than
   // normal discovery jobs. Keep repair batches smaller, while normal sync
   // still drains at the proven 8-job sequential rate.
-  const max=urgentRepairs>0?4:8;
+  const max=urgentRepairs>0?3:8;
   return{limit:Math.max(1,Math.min(max,backlog||1)),concurrency:1};
 }
 
 Deno.serve(async req=>{
   try{await requireCronSecret(req)}catch(response){return response as Response}
   const db=serviceClient();
+  const activeCutoff=new Date(Date.now()-140_000).toISOString();
+  const{data:activeRun,error:activeRunError}=await db.from('sync_runs')
+    .select('id,started_at')
+    .eq('run_type','worker')
+    .is('finished_at',null)
+    .gte('started_at',activeCutoff)
+    .order('started_at',{ascending:false})
+    .limit(1)
+    .maybeSingle();
+  if(activeRunError)return Response.json({error:activeRunError.message},{status:500});
+  if(activeRun)return Response.json({ok:true,skipped:'worker_busy',activeRunId:activeRun.id,activeStartedAt:activeRun.started_at});
+
   let provider:UpstreamProvider;
   try{provider=new UpstreamProvider(await getUpstreamBaseUrl(db))}
   catch(error){return Response.json({error:errorMessage(error)},{status:500})}
