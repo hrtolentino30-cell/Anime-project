@@ -62,6 +62,12 @@ function formatTime(seconds: number) {
     : `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
+function isAppleTouchDevice() {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/i.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 function targetIsInteractive(target: EventTarget | null) {
   return target instanceof Element &&
     Boolean(target.closest('button,a,input,select,textarea,[role="button"],.bbp-panel,.bbp-react,.bbp-actions,.bbp-top,.bbp-progress'));
@@ -524,39 +530,85 @@ export function Player({
 
   const enterLandscapeFullscreen = useCallback(() => {
     const root = rootRef.current;
+    const video = videoRef.current;
     if (!root) return;
-
-    setImmersiveMode(true);
 
     const orientation = (screen as any).orientation as {
       lock?: (orientation: 'landscape') => Promise<void>;
     } | undefined;
+
+    // iPhone/iPad: use the native video fullscreen presentation. This is the
+    // real system fullscreen that removes Safari chrome. iOS owns the controls
+    // while the video is in this mode.
+    if (isAppleTouchDevice() && !embedMode && video) {
+      const nativeVideo = video as HTMLVideoElement & {
+        webkitEnterFullscreen?: () => void;
+        webkitSetPresentationMode?: (mode: 'inline' | 'picture-in-picture' | 'fullscreen') => void;
+      };
+      try { void orientation?.lock?.('landscape'); } catch {}
+      try {
+        if (typeof nativeVideo.webkitEnterFullscreen === 'function') {
+          nativeVideo.webkitEnterFullscreen();
+          emit('native_fullscreen_request', source?.id);
+          return;
+        }
+        if (typeof nativeVideo.webkitSetPresentationMode === 'function') {
+          nativeVideo.webkitSetPresentationMode('fullscreen');
+          emit('native_fullscreen_request', source?.id);
+          return;
+        }
+      } catch {}
+    }
+
     const element = root as HTMLDivElement & { webkitRequestFullscreen?: () => void };
 
-    // Never call video.webkitEnterFullscreen(): on iPhone that replaces
-    // Animori with Apple's native media UI. Try element fullscreen only; the
-    // CSS immersive landscape canvas remains active if Safari rejects it.
+    // Other browsers: only mark the player immersive after a real fullscreen
+    // request succeeds. Do not fall back to the old CSS-only fake fullscreen.
     if (!document.fullscreenElement && root.requestFullscreen) {
       void root.requestFullscreen()
         .then(async () => {
+          setImmersiveMode(true);
           try { await orientation?.lock?.('landscape'); } catch {}
           syncLayout();
         })
-        .catch(() => {});
-    } else if (!document.fullscreenElement && element.webkitRequestFullscreen) {
+        .catch(() => {
+          toast('Fullscreen was blocked by this browser');
+        });
+      return;
+    }
+
+    if (!document.fullscreenElement && element.webkitRequestFullscreen) {
       try {
         element.webkitRequestFullscreen();
+        setImmersiveMode(true);
         try { void orientation?.lock?.('landscape'); } catch {}
-      } catch {}
-    } else {
-      try { void orientation?.lock?.('landscape'); } catch {}
+        syncLayout();
+      } catch {
+        toast('Fullscreen was blocked by this browser');
+      }
+      return;
     }
-  }, [setImmersiveMode, syncLayout]);
+
+    toast('Fullscreen is unavailable on this source/browser');
+  }, [embedMode, emit, setImmersiveMode, source?.id, syncLayout, toast]);
 
   const exitLandscapeFullscreen = useCallback(async () => {
+    const video = videoRef.current as (HTMLVideoElement & {
+      webkitExitFullscreen?: () => void;
+      webkitDisplayingFullscreen?: boolean;
+      webkitSetPresentationMode?: (mode: 'inline' | 'picture-in-picture' | 'fullscreen') => void;
+    }) | null;
+
     try {
-      if (document.fullscreenElement) await document.exitFullscreen();
+      if (video?.webkitDisplayingFullscreen && typeof video.webkitExitFullscreen === 'function') {
+        video.webkitExitFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (isAppleTouchDevice() && typeof video?.webkitSetPresentationMode === 'function') {
+        video.webkitSetPresentationMode('inline');
+      }
     } catch {}
+
     setImmersiveMode(false);
     setPanel(null);
     setReactionOpen(false);
@@ -573,6 +625,33 @@ export function Player({
       document.body.classList.remove('animori-player-immersive');
     };
   }, [immersive, setImmersiveMode]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const onNativeBegin = () => {
+      // Native iOS fullscreen owns the entire screen; make sure the old CSS
+      // immersive shell is not left active behind it.
+      setImmersiveMode(false);
+      emit('native_fullscreen_enter', source?.id);
+    };
+    const onNativeEnd = () => {
+      setImmersiveMode(false);
+      setPanel(null);
+      setReactionOpen(false);
+      showControls();
+      syncLayout();
+      emit('native_fullscreen_exit', source?.id);
+    };
+
+    video.addEventListener('webkitbeginfullscreen', onNativeBegin as EventListener);
+    video.addEventListener('webkitendfullscreen', onNativeEnd as EventListener);
+    return () => {
+      video.removeEventListener('webkitbeginfullscreen', onNativeBegin as EventListener);
+      video.removeEventListener('webkitendfullscreen', onNativeEnd as EventListener);
+    };
+  }, [emit, setImmersiveMode, showControls, source?.id, syncLayout]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -883,12 +962,21 @@ export function Player({
     playbackStartedRef.current = true;
     setPlaybackStarted(true);
     setPanel(null);
-    enterLandscapeFullscreen();
     showControls();
-    if (embedMode) return;
+
+    if (embedMode) {
+      enterLandscapeFullscreen();
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
-    void video.play().catch(() => {
+
+    // Keep both calls in the same user-gesture task. iOS requires this for
+    // native fullscreen, and other mobile browsers require it for fullscreen.
+    const playPromise = video.play();
+    enterLandscapeFullscreen();
+    void playPromise.catch(() => {
       playbackStartedRef.current = false;
       setPlaybackStarted(false);
       setControlsVisible(false);
