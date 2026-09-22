@@ -40,3 +40,6 @@ body.animori-player-immersive{overflow:hidden!important;overscroll-behavior:none
 }
 
 .bbp-root:not(.bbp-immersive) .bbp-loading{background:rgba(9,9,9,.78);backdrop-filter:blur(8px)}
+
+/* Keep immersive landscape playback bright: no vignette/shade over the video. */
+.bbp-root.bbp-immersive .bbp-shade{display:none!important}
