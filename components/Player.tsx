@@ -634,6 +634,10 @@ export function Player({
       // Native iOS fullscreen owns the entire screen; make sure the old CSS
       // immersive shell is not left active behind it.
       setImmersiveMode(false);
+      try {
+        const orientation = (screen as any).orientation as { lock?: (mode: 'landscape') => Promise<void> } | undefined;
+        void orientation?.lock?.('landscape').catch(() => {});
+      } catch {}
       emit('native_fullscreen_enter', source?.id);
     };
     const onNativeEnd = () => {
@@ -1102,7 +1106,6 @@ export function Player({
       <video
         ref={videoRef}
         className={`bbp-video ${embedMode ? 'bbp-hidden' : ''}`}
-        playsInline
         preload="metadata"
         poster={backdropUrl || undefined}
         controlsList="nodownload noremoteplayback"
