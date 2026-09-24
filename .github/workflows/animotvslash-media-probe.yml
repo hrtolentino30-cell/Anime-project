@@ -1,3 +1,4 @@
+# Auth repaired: publisher derives the Animori Page token from the durable user token.
 name: Animori Facebook uploads
 
 on:
