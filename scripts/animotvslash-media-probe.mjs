@@ -8,6 +8,8 @@ const proxy = (process.env.FACEBOOK_UPLOAD_PROXY_URL || '').trim();
 const oidcBase = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || '';
 const oidcReq = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || '';
 let token = '', tokenAt = 0, job, browser;
+const ONA_RE = /(^|[^a-z0-9])ona([^a-z0-9]|$)/i;
+const isOna = (...values) => values.some(value => ONA_RE.test(String(value || '')));
 async function oidc() {
   if (token && Date.now() - tokenAt < 180000) return token;
   const r = await fetch(oidcBase + (oidcBase.includes('?') ? '&' : '?') + 'audience=animori-facebook-upload', {headers:{authorization:'Bearer ' + oidcReq},signal:AbortSignal.timeout(30000)});
@@ -32,10 +34,14 @@ async function verify(videoId) {
     const data = await api('status',undefined,'&video_id=' + encodeURIComponent(videoId));
     console.log('FACEBOOK_PROCESSING=' + JSON.stringify(data));
     if (data.published === true && data.status?.video_status === 'ready') {
-      await api('complete',{});
-      console.log('FACEBOOK_PUBLISHED_VIDEO_ID=' + videoId);
-      console.log('FACEBOOK_PERMALINK=' + (data.permalink_url || ''));
-      return;
+      const surfaced = await api('surface',undefined,'&video_id=' + encodeURIComponent(videoId));
+      console.log('FACEBOOK_SURFACE=' + JSON.stringify(surfaced));
+      if (surfaced.public === true && surfaced.reel === true && surfaced.published_post === true) {
+        await api('complete',{});
+        console.log('FACEBOOK_PUBLISHED_VIDEO_ID=' + videoId);
+        console.log('FACEBOOK_PERMALINK=' + (data.permalink_url || ''));
+        return;
+      }
     }
     if (/error|failed/i.test(JSON.stringify(data.status || {}))) {
       const error = new Error('Facebook processing failed: ' + JSON.stringify(data.status)); error.terminal = true; throw error;
@@ -50,6 +56,11 @@ try {
   job = (await api('next',undefined,requested ? '&episode_url=' + encodeURIComponent(requested) : '')).job;
   if (!job) { console.log('FACEBOOK_QUEUE_EMPTY'); process.exit(0); }
   console.log('FACEBOOK_QUEUE_CLAIMED=' + job.episode_id);
+  if (isOna(job.episode_url)) {
+    const error = new Error('ONA titles are excluded from Facebook publishing');
+    error.terminal = true;
+    throw error;
+  }
   if (job.finish_accepted && job.destination_video_id) {
     await verify(job.destination_video_id);
   } else {
@@ -84,6 +95,11 @@ try {
     for (const media of declared) hits.set(media, {referer: job.episode_url, 'user-agent': browserAgent});
     console.log('DECLARED_MEDIA_COUNT=' + declared.length);
     const title = (await page.title()).replace(/\s*[-|–—:]?\s*ANIMOTVSLASH\s*$/i,'').trim();
+    if (isOna(title, job.episode_url)) {
+      const error = new Error('ONA titles are excluded from Facebook publishing');
+      error.terminal = true;
+      throw error;
+    }
     // Interact inside embedded frames: the old worker only clicked the outer document.
     const deadline = Date.now() + 65000;
     const clicked = new Set();
