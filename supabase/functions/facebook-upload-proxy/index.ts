@@ -10,19 +10,37 @@ let PAGE_TOKEN_CACHE = "";
 
 async function pageToken() {
   if (PAGE_TOKEN_CACHE) return PAGE_TOKEN_CACHE;
-  if (!BASE_TOKEN || !PID) return "";
-  const r = await fetch(`https://graph.facebook.com/${GV}/me/accounts?fields=id,access_token&limit=100&access_token=${encodeURIComponent(BASE_TOKEN)}`, {
-    signal: AbortSignal.timeout(30000)
-  });
-  const j = await r.json();
-  if (r.ok && Array.isArray(j.data)) {
-    const page = j.data.find((x: {id?: string; access_token?: string}) => String(x.id || "") === PID);
-    if (page?.access_token) {
-      PAGE_TOKEN_CACHE = String(page.access_token);
-      return PAGE_TOKEN_CACHE;
+  if (!BASE_TOKEN || !PID) throw new Error("Meta Page token derivation unavailable: configuration missing");
+
+  let lastError = "unknown error";
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const r = await fetch(
+        `https://graph.facebook.com/${GV}/me/accounts?fields=id,access_token&limit=100&access_token=${encodeURIComponent(BASE_TOKEN)}`,
+        { signal: AbortSignal.timeout(30000) }
+      );
+      const j = await r.json();
+      if (!r.ok || j.error) {
+        lastError = j.error?.message || `HTTP ${r.status}`;
+      } else if (Array.isArray(j.data)) {
+        const page = j.data.find((x: {id?: string; access_token?: string}) => String(x.id || "") === PID);
+        if (page?.access_token) {
+          PAGE_TOKEN_CACHE = String(page.access_token);
+          return PAGE_TOKEN_CACHE;
+        }
+        lastError = "Animori Page token missing from /me/accounts";
+      } else {
+        lastError = "Unexpected /me/accounts response";
+      }
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
     }
+
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 400 * attempt));
   }
-  return BASE_TOKEN;
+
+  // Never fall back to the USER token for video operations.
+  throw new Error(`Meta Page token derivation failed: ${lastError}`);
 }
 const SU = Deno.env.get("SUPABASE_URL") || "";
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
