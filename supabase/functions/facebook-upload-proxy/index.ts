@@ -12,6 +12,17 @@ async function pageToken() {
   if (PAGE_TOKEN_CACHE) return PAGE_TOKEN_CACHE;
   if (!BASE_TOKEN || !PID) throw new Error("Meta Page token derivation unavailable: configuration missing");
 
+  // Shared encrypted cache: avoids re-deriving the Page token on every Edge isolate.
+  try {
+    const cached = await rpc("facebook_page_token_cache_get",{});
+    if (typeof cached === "string" && cached.length > 20) {
+      PAGE_TOKEN_CACHE = cached;
+      return PAGE_TOKEN_CACHE;
+    }
+  } catch (e) {
+    console.error("PAGE_TOKEN_CACHE_READ_FAILED", e instanceof Error ? e.message : String(e));
+  }
+
   let lastError = "unknown error";
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -22,10 +33,16 @@ async function pageToken() {
       const j = await r.json();
       if (!r.ok || j.error) {
         lastError = j.error?.message || `HTTP ${r.status}`;
+        if (Number(j.error?.code) === 4) break;
       } else if (Array.isArray(j.data)) {
         const page = j.data.find((x: {id?: string; access_token?: string}) => String(x.id || "") === PID);
         if (page?.access_token) {
           PAGE_TOKEN_CACHE = String(page.access_token);
+          try {
+            await rpc("facebook_page_token_cache_set",{p_token:PAGE_TOKEN_CACHE});
+          } catch (e) {
+            console.error("PAGE_TOKEN_CACHE_WRITE_FAILED", e instanceof Error ? e.message : String(e));
+          }
           return PAGE_TOKEN_CACHE;
         }
         lastError = "Animori Page token missing from /me/accounts";
@@ -36,12 +53,13 @@ async function pageToken() {
       lastError = e instanceof Error ? e.message : String(e);
     }
 
-    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 400 * attempt));
+    if (attempt < 3) await new Promise(resolve => setTimeout(resolve, 800 * attempt));
   }
 
   // Never fall back to the USER token for video operations.
   throw new Error(`Meta Page token derivation failed: ${lastError}`);
 }
+
 const SU = Deno.env.get("SUPABASE_URL") || "";
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
@@ -127,10 +145,30 @@ Deno.serve(async (req: Request) => {
       if (!r.ok) throw new Error("Queue availability lookup failed");
       const rows = await r.json();
       const pending = Array.isArray(rows) ? rows.length : 0;
-      return Response.json({available:pending > 0,pending});
+      if (pending === 0) return Response.json({available:false,pending:0});
+      try {
+        await pageToken();
+      } catch (e) {
+        return Response.json({
+          available:false,
+          pending,
+          blocked:"meta_auth",
+          reason:e instanceof Error ? e.message : String(e)
+        });
+      }
+      return Response.json({available:true,pending});
     }
 
     if (phase === "next") {
+      try {
+        await pageToken();
+      } catch (e) {
+        return Response.json({
+          job:null,
+          blocked:"meta_auth",
+          reason:e instanceof Error ? e.message : String(e)
+        });
+      }
       return Response.json({job:await rpc("claim_facebook_upload",{
         p_episode_url:url.searchParams.get("episode_url") || null
       })});
