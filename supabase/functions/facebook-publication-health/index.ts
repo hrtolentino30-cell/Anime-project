@@ -7,6 +7,17 @@ let PAGE_TOKEN_CACHE="";
 async function pageToken(){
   if(PAGE_TOKEN_CACHE) return PAGE_TOKEN_CACHE;
   if(!BASE_TOKEN||!PID) throw new Error("Meta Page token derivation unavailable: configuration missing");
+
+  try{
+    const cached=await db.rpc("facebook_page_token_cache_get");
+    if(!cached.error && typeof cached.data==="string" && cached.data.length>20){
+      PAGE_TOKEN_CACHE=cached.data;
+      return PAGE_TOKEN_CACHE;
+    }
+  }catch(e){
+    console.error("PAGE_TOKEN_CACHE_READ_FAILED",e instanceof Error?e.message:String(e));
+  }
+
   let lastError="unknown error";
   for(let attempt=1;attempt<=3;attempt++){
     try{
@@ -14,9 +25,14 @@ async function pageToken(){
       const j=await r.json();
       if(!r.ok||j.error){
         lastError=j.error?.message||`HTTP ${r.status}`;
+        if(Number(j.error?.code)===4) break;
       }else if(Array.isArray(j.data)){
         const page=j.data.find((x:any)=>String(x.id||"")===PID);
-        if(page?.access_token){PAGE_TOKEN_CACHE=String(page.access_token);return PAGE_TOKEN_CACHE;}
+        if(page?.access_token){
+          PAGE_TOKEN_CACHE=String(page.access_token);
+          try{await db.rpc("facebook_page_token_cache_set",{p_token:PAGE_TOKEN_CACHE});}catch{}
+          return PAGE_TOKEN_CACHE;
+        }
         lastError="Animori Page token missing from /me/accounts";
       }else{
         lastError="Unexpected /me/accounts response";
@@ -24,10 +40,11 @@ async function pageToken(){
     }catch(e){
       lastError=e instanceof Error?e.message:String(e);
     }
-    if(attempt<3) await new Promise(resolve=>setTimeout(resolve,400*attempt));
+    if(attempt<3) await new Promise(resolve=>setTimeout(resolve,800*attempt));
   }
   throw new Error(`Meta Page token derivation failed: ${lastError}`);
 }
+
 const SU=Deno.env.get("SUPABASE_URL")||"";
 const SK=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 
