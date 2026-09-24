@@ -5,7 +5,25 @@ const REPO = "hrtolentino30-cell/Anime-project";
 const WORKFLOW = `${REPO}/.github/workflows/animotvslash-media-probe.yml@refs/heads/main`;
 const GV = Deno.env.get("META_GRAPH_VERSION") || "v26.0";
 const PID = Deno.env.get("META_PAGE_ID") || "";
-const PT = Deno.env.get("META_PAGE_ACCESS_TOKEN") || "";
+const BASE_TOKEN = Deno.env.get("META_PAGE_ACCESS_TOKEN") || "";
+let PAGE_TOKEN_CACHE = "";
+
+async function pageToken() {
+  if (PAGE_TOKEN_CACHE) return PAGE_TOKEN_CACHE;
+  if (!BASE_TOKEN || !PID) return "";
+  const r = await fetch(`https://graph.facebook.com/${GV}/me/accounts?fields=id,access_token&limit=100&access_token=${encodeURIComponent(BASE_TOKEN)}`, {
+    signal: AbortSignal.timeout(30000)
+  });
+  const j = await r.json();
+  if (r.ok && Array.isArray(j.data)) {
+    const page = j.data.find((x: {id?: string; access_token?: string}) => String(x.id || "") === PID);
+    if (page?.access_token) {
+      PAGE_TOKEN_CACHE = String(page.access_token);
+      return PAGE_TOKEN_CACHE;
+    }
+  }
+  return BASE_TOKEN;
+}
 const SU = Deno.env.get("SUPABASE_URL") || "";
 const SK = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
@@ -37,15 +55,15 @@ async function graph(path: string, body?: BodyInit) {
 
 async function status(id: string) {
   if (!/^\d+$/.test(id)) throw new Error("Invalid video ID");
-  return await graph(`${id}?fields=id,permalink_url,published,status,privacy&access_token=${encodeURIComponent(PT)}`);
+  return await graph(`${id}?fields=id,permalink_url,published,status,privacy&access_token=${encodeURIComponent(await pageToken())}`);
 }
 
 async function surface(id: string) {
   if (!/^\d+$/.test(id)) throw new Error("Invalid video ID");
   const [video,reels,posts] = await Promise.all([
     status(id),
-    graph(`${PID}/video_reels?limit=100&fields=id&access_token=${encodeURIComponent(PT)}`),
-    graph(`${PID}/published_posts?limit=100&fields=id,permalink_url,status_type&access_token=${encodeURIComponent(PT)}`)
+    graph(`${PID}/video_reels?limit=100&fields=id&access_token=${encodeURIComponent(await pageToken())}`),
+    graph(`${PID}/published_posts?limit=100&fields=id,permalink_url,status_type&access_token=${encodeURIComponent(await pageToken())}`)
   ]);
   const reel = Array.isArray(reels.data) && reels.data.some((x: {id?: string}) => String(x.id || "") === id);
   const post = Array.isArray(posts.data) && posts.data.some((x: {permalink_url?: string}) =>
@@ -79,7 +97,7 @@ Deno.serve(async (req: Request) => {
     return Response.json({error:"Unauthorized"},{status:401});
   }
 
-  if (!PID || !PT) return Response.json({error:"Meta configuration missing"},{status:503});
+  if (!PID || !BASE_TOKEN) return Response.json({error:"Meta configuration missing"},{status:503});
 
   try {
     const url = new URL(req.url), phase = url.searchParams.get("phase");
@@ -160,7 +178,7 @@ Deno.serve(async (req: Request) => {
       if (!Number.isSafeInteger(data.file_size) || data.file_size <= 0) throw new Error("Invalid file size");
       await transition("reserve");
       const result = await graph(`${PID}/videos`,new URLSearchParams({
-        access_token:PT,
+        access_token:await pageToken(),
         upload_phase:"start",
         file_size:String(data.file_size)
       }));
@@ -173,7 +191,7 @@ Deno.serve(async (req: Request) => {
     if (phase === "transfer") {
       if (!job.upload_session_id || job.finish_accepted) throw new Error("No transferable upload session");
       const body = new FormData();
-      body.set("access_token",PT);
+      body.set("access_token",await pageToken());
       body.set("upload_phase","transfer");
       body.set("upload_session_id",job.upload_session_id);
       body.set("start_offset",url.searchParams.get("start_offset") || "0");
@@ -188,7 +206,7 @@ Deno.serve(async (req: Request) => {
       if (job.finish_accepted) return Response.json({success:true});
       const data = await req.json();
       const result = await graph(`${PID}/videos`,new URLSearchParams({
-        access_token:PT,
+        access_token:await pageToken(),
         upload_phase:"finish",
         upload_session_id:job.upload_session_id,
         title:data.title || "",
