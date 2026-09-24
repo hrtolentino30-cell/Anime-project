@@ -20,7 +20,7 @@ async function api(phase, body, query = '') {
   const headers = {authorization:'Bearer ' + await oidc()};
   if (job) { headers['x-episode-id'] = job.episode_id; headers['x-upload-attempt'] = String(job.attempts); }
   if (body) headers['content-type'] = Buffer.isBuffer(body) ? 'application/octet-stream' : 'application/json';
-  const r = await fetch(proxy + '?phase=' + phase + query, {method:body ? 'POST' : 'GET',headers,body:body ? (Buffer.isBuffer(body) ? body : JSON.stringify(body)) : undefined,signal:AbortSignal.timeout(110000)});
+  const r = await fetch(proxy + '?phase=' + phase + query, {method:body ? 'POST' : 'GET',headers,body:body ? (Buffer.isBuffer(body) ? body : JSON.stringify(body)) : undefined,signal:AbortSignal.timeout(140000)});
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
     const error = new Error(`${phase} failed (${r.status}): ${JSON.stringify(data)}`);
@@ -235,7 +235,21 @@ try {
         if (!Number.isSafeInteger(start) || !Number.isSafeInteger(rawEnd) || !Number.isSafeInteger(end) || start<0 || end<=start) throw new Error('Invalid Meta upload offsets');
         const buf=Buffer.alloc(end-start), got=readSync(fd,buf,0,buf.length,start);
         if (got!==buf.length) throw new Error('Unexpected end of media file');
-        state=await api('transfer',buf,'&start_offset='+start);
+        let transferError;
+        for (let transferAttempt=1; transferAttempt<=3; transferAttempt++) {
+          try {
+            state=await api('transfer',buf,'&start_offset='+start);
+            transferError=null;
+            break;
+          } catch (error) {
+            transferError=error;
+            const transient=!error.terminal && /timeout|timed out|aborted|502|503|504|fetch failed|network|ECONNRESET/i.test(error.message || '');
+            if (!transient || transferAttempt===3) throw error;
+            console.warn(`FACEBOOK_TRANSFER_RETRY=${transferAttempt} offset=${start} error=${error.message}`);
+            await new Promise(resolve=>setTimeout(resolve,1500*transferAttempt));
+          }
+        }
+        if (transferError) throw transferError;
         if (Number(state.start_offset)<=start) throw new Error('Meta upload made no progress');
         console.log(`FACEBOOK_UPLOAD_PROGRESS=${state.start_offset}/${size}`);
       }
