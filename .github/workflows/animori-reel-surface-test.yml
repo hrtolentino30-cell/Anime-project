@@ -1,0 +1,42 @@
+name: Animori Reel Surface Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/animori-reel-surface-test.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  test-reel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Generate vertical test clip
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -y \
+            -f lavfi -i "color=c=black:s=540x960:r=30:d=6" \
+            -f lavfi -i "anullsrc=channel_layout=stereo:sample_rate=44100" \
+            -vf "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text=ANIMORI:fontcolor=white:fontsize=64:x=(w-text_w)/2:y=(h-text_h)/2-55,drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf:text=SYSTEM\\ TEST:fontcolor=white:fontsize=32:x=(w-text_w)/2:y=(h-text_h)/2+35" \
+            -c:v libx264 -pix_fmt yuv420p -profile:v high -level 4.0 \
+            -c:a aac -b:a 96k -shortest -movflags +faststart reel-test.mp4
+      - name: Obtain GitHub OIDC token
+        id: oidc
+        run: |
+          TOKEN=$(curl -fsSL -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=animori-facebook-reels-test" | jq -r .value)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+      - name: Publish through dedicated Reels API
+        env:
+          OIDC_TOKEN: ${{ steps.oidc.outputs.token }}
+        run: |
+          curl -fsS --retry 2 \
+            -H "Authorization: Bearer $OIDC_TOKEN" \
+            -H "Content-Type: video/mp4" \
+            --data-binary @reel-test.mp4 \
+            https://agiqhqnqkiagnabbczyf.supabase.co/functions/v1/facebook-reels-test-proxy | tee result.json
+          cat result.json
