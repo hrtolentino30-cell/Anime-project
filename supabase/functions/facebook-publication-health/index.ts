@@ -2,7 +2,19 @@
 import { createClient } from "npm:@supabase/supabase-js@2.116.0";
 const GV=Deno.env.get("META_GRAPH_VERSION")||"v26.0";
 const PID=Deno.env.get("META_PAGE_ID")||"";
-const PT=Deno.env.get("META_PAGE_ACCESS_TOKEN")||"";
+const BASE_TOKEN=Deno.env.get("META_PAGE_ACCESS_TOKEN")||"";
+let PAGE_TOKEN_CACHE="";
+async function pageToken(){
+  if(PAGE_TOKEN_CACHE) return PAGE_TOKEN_CACHE;
+  if(!BASE_TOKEN||!PID) return "";
+  const r=await fetch(`https://graph.facebook.com/${GV}/me/accounts?fields=id,access_token&limit=100&access_token=${encodeURIComponent(BASE_TOKEN)}`,{signal:AbortSignal.timeout(30000)});
+  const j=await r.json();
+  if(r.ok&&Array.isArray(j.data)){
+    const page=j.data.find((x:any)=>String(x.id||"")===PID);
+    if(page?.access_token){PAGE_TOKEN_CACHE=String(page.access_token);return PAGE_TOKEN_CACHE;}
+  }
+  return BASE_TOKEN;
+}
 const SU=Deno.env.get("SUPABASE_URL")||"";
 const SK=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 
@@ -16,7 +28,7 @@ async function authorized(req:Request){
 }
 async function graph(path:string){
   const sep=path.includes("?")?"&":"?";
-  const r=await fetch(`https://graph.facebook.com/${GV}/${path}${sep}access_token=${encodeURIComponent(PT)}`,{
+  const r=await fetch(`https://graph.facebook.com/${GV}/${path}${sep}access_token=${encodeURIComponent(await pageToken())}`,{
     signal:AbortSignal.timeout(30000)
   });
   const j=await r.json();
@@ -25,7 +37,7 @@ async function graph(path:string){
 }
 Deno.serve(async(req)=>{
   if(!(await authorized(req))) return Response.json({error:"unauthorized"},{status:401});
-  if(!PID||!PT||!SU||!SK) return Response.json({error:"configuration missing"},{status:503});
+  if(!PID||!BASE_TOKEN||!SU||!SK) return Response.json({error:"configuration missing"},{status:503});
 
   const since=new Date(Date.now()-6*60*60*1000).toISOString();
   const {data:rows,error}=await db
