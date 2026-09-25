@@ -254,7 +254,7 @@ try {
         console.log(`FACEBOOK_UPLOAD_PROGRESS=${state.start_offset}/${size}`);
       }
     } finally {closeSync(fd);}
-    const description = `${title}\nVisit: https://animori.bond`;
+    const description = `${title}\nVisit: https://animoritv.org`;
     await api('finish',{title,description});
     await verify(videoId);
   }
