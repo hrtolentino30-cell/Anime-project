@@ -62,3 +62,7 @@
   .installAppIcon{width:46px;height:46px}
   .installAppBody h2{font-size:20px}
 }
+
+
+/* Legal pages */
+.legalArticle{display:grid;gap:26px;padding-bottom:40px}.legalArticle section{background:#0d121a;border:1px solid #202a38;border-radius:16px;padding:22px 24px}.legalArticle h2{font-size:18px;margin:0 0 10px;letter-spacing:-.02em}.legalArticle p,.legalArticle li{color:var(--muted);line-height:1.75;font-size:14px}.legalArticle p{margin:9px 0}.legalArticle ol{margin:10px 0 0;padding-left:22px}.legalArticle li+li{margin-top:8px}.legalArticle a{color:#c4b5fd;text-decoration:underline;text-underline-offset:3px}.legalArticle strong{color:var(--text)}.footer nav{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:flex-end}@media(max-width:760px){.footer{gap:24px;flex-direction:column}.footer nav{justify-content:flex-start}.legalArticle section{padding:18px}}
