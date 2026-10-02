@@ -49,6 +49,12 @@ Deno.serve(async req=>{
   if(backlogError||urgentError)return Response.json({error:(backlogError??urgentError)?.message},{status:500});
   const pending=Math.max(0,Number(backlog??0));
   const urgent=Math.max(0,Number(urgentRepairs??0));
+
+  // Cron wakes the worker every 30 seconds. When the queue is empty, avoid
+  // creating and immediately updating a sync_runs row just to record no work.
+  // Stale-job recovery and the queue checks above still run on every wake-up.
+  if(pending===0)return Response.json({ok:true,skipped:'idle',backlogBefore:0,backlogAfter:0,urgentRepairs:urgent,batchLimit:0,concurrency:0});
+
   const mode=capacity(pending,urgent);
 
   const{data:run,error:runError}=await db.from('sync_runs').insert({run_type:'worker',details:{backlog:pending,urgent_repairs:urgent,batch_limit:mode.limit,concurrency:mode.concurrency}}).select('id').single();
