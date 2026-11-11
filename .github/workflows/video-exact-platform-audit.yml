@@ -1,0 +1,19 @@
+name: Exact video workflow public-platform audit
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/video-exact-platform-audit.yml
+      - research/video-exact-platform-audit.py
+jobs:
+  public-platform-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install public browser
+        run: |
+          python -m pip install --quiet playwright
+          python -m playwright install chromium
+      - name: Inspect public sites only (no account or trades)
+        run: python research/video-exact-platform-audit.py
