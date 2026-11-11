@@ -44,10 +44,6 @@ counts=collections.Counter()
 for addr,r in records.items():
   p=pair_by_pool.get(addr)
   if not p:
-    matches=[x for x in pairs if (x.get("baseToken") or {}).get("address")==r["mint"]]
-    p=max(matches,key=lambda x:float((x.get("liquidity") or {}).get("usd") or 0),default=None)
-    if p:counts["pair_different"]+=1
-  if not p:
     counts["no_dex_match"]+=1
     continue
   mc=p.get("marketCap")
@@ -71,12 +67,13 @@ for addr,r in records.items():
   rec={"token":(p.get("baseToken") or {}).get("symbol"),"mint":r["mint"],"pair":p.get("pairAddress"),"pool":addr,"dex":d,"stage":stage,"mc_usd":mc,"vol_24h_usd":vol,"liq_usd":liq,"price0":float(price),"url":p.get("url"),"created":r["created"],"global_fees_sol":None,"tracked_wallet_signal":None,"viral_signal":None}
   eligible.append(rec)
 eligible=sorted(eligible,key=lambda x:(x["stage"]!="migrated_proxy",-float(x["vol_24h_usd"] or 0)))
+eligible=list({x["mint"]:x for x in reversed(eligible)}.values())[::-1]
 log("FILTER_COUNTS",json.dumps(counts))
 log("NUMERIC_CANDIDATES",len(eligible))
 for c in eligible[:15]:log("CANDIDATE",json.dumps(c))
 selected=eligible[:20]
 if selected:
-  log("BEGIN_PAPER_OBSERVATION",len(selected),"mode=NO_POSITION_NO_TRADES",flush=True)
+  log("BEGIN_PAPER_OBSERVATION",len(selected),"mode=NO_POSITION_NO_TRADES")
   time.sleep(120)
   now=datetime.datetime.now(datetime.timezone.utc).isoformat()
   batch_mints=list(dict.fromkeys(x["mint"] for x in selected))
