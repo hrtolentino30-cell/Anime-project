@@ -1,0 +1,29 @@
+name: One-time public video transcript
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/public-video-transcript.yml
+jobs:
+  transcribe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and transcribe public X recording
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 3 --max-time 900 'https://video.twimg.com/amplify_video/2111839218263638016/vid/avc1/1920x1080/dDOKejN15JqosSWA.mp4?tag=29' -o /tmp/source.mp4
+          ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 /tmp/source.mp4
+          ffmpeg -hide_banner -loglevel error -y -i /tmp/source.mp4 -vn -ac 1 -ar 16000 -b:a 32k /tmp/audio.mp3
+          python -m pip install --disable-pip-version-check --quiet 'faster-whisper==1.2.1'
+          python - <<'PY'
+          from faster_whisper import WhisperModel
+          model = WhisperModel("base.en", device="cpu", compute_type="int8", cpu_threads=4)
+          segments, info = model.transcribe("/tmp/audio.mp3", beam_size=3, vad_filter=True, initial_prompt="Solana memecoins, Axiom Pulse, FOMO trading terminal, J7 Tracker, market capitalization, liquidity and volume.")
+          print("TRANSCRIPT_BEGIN")
+          for seg in segments:
+              print(f"[{seg.start:07.2f} - {seg.end:07.2f}] {seg.text.strip()}", flush=True)
+          print("TRANSCRIPT_END")
+          PY
