@@ -15,6 +15,7 @@ jobs:
         run: |
           set -euo pipefail
           curl -fLsS --retry 3 --max-time 900 'https://video.twimg.com/amplify_video/2111839218263638016/vid/avc1/1920x1080/dDOKejN15JqosSWA.mp4?tag=29' -o /tmp/source.mp4
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
           ffprobe -v error -show_entries format=duration,size -of default=noprint_wrappers=1 /tmp/source.mp4
           ffmpeg -hide_banner -loglevel error -y -i /tmp/source.mp4 -vn -ac 1 -ar 16000 -b:a 32k /tmp/audio.mp3
           python -m pip install --disable-pip-version-check --quiet 'faster-whisper==1.2.1'
