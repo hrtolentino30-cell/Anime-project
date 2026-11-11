@@ -2,7 +2,8 @@ import urllib.request, urllib.error, re, json, time, subprocess
 from urllib.parse import urlparse
 urls={
  "Axiom": "https://axiom.trade/pulse?chain=sol",
- "FOMO": "https://fomoo.family/",
+ "FOMO": "https://fomo.family/",
+ "FOMO_App": "https://app.fomo.family/",
  "J7_Video": "https://j7tracker.io/",
  "J7_Alternate": "https://j7track.com/"
 }
