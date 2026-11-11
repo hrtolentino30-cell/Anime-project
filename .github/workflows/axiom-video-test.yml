@@ -1,0 +1,13 @@
+name: Paper test video Axiom FOMO J7
+on:
+  pull_request:
+    branches: [main]
+    paths: [".github/workflows/axiom-video-test.yml", "research/axiom-video-test.py"]
+jobs:
+  paper-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe open market data
+        run: python research/axiom-video-test.py
